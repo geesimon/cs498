@@ -3,9 +3,9 @@ title: "Homework 1 Problem 1"
 author: "CS 498, Spring 2018, Xiaoming Ji"
 date: ''
 output:
-  pdf_document: default
   html_document:
     toc: yes
+  pdf_document: default
 ---
 
 ```{r}
@@ -14,7 +14,6 @@ data  = read.csv("pima-indians-diabetes.data.csv", header = FALSE)
 #head(data)
 all_x = data[,-c(9)]
 all_y = data[,9]
-hist(all_x$V1)
 ```
 
 ##Part A
@@ -36,8 +35,12 @@ eval_y = all_y[-train_index]
 We first calculate p(y=1) and p(y=0)
 ```{r}
 p_y_1 = length(train_y[train_y == 1]) / train_len
-p_y_0 = 1 - p_positive
+p_y_0 = 1 - p_y_1
 ```
+
+$$
+\frac{1}{{\sigma \sqrt {2\pi }}}e^-\frac{{\left({x - \mu} \right)^2}}{2\sigma^2}
+$$
 
 ```{r}
 wdat<-read.csv('pima-indians-diabetes.data.csv', header=FALSE)
