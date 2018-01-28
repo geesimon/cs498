@@ -127,75 +127,76 @@ $(document).ready(function () {
 </ul>
 </div>
 
-<pre class="r"><code>library(readr)
-data  = read.csv(&quot;pima-indians-diabetes.data.csv&quot;, header = FALSE)
-#head(data)
-all_x = data[,-c(9)]
-all_y = data[,9]</code></pre>
 <div id="part-a" class="section level2">
 <h2>Part A</h2>
 <p>Build a simple naive Bayes classifier to classify this data set. We will use 20% of the data for evaluation and the other 80% for training. There are a total of 768 data-points.</p>
 <p>We use a normal distribution to model each of the class-conditional distributions.</p>
-<pre class="r"><code>#Prepare data
+<pre class="r"><code>#Prepare training and testing data
+library(readr)
+data  = read.csv(&quot;pima-indians-diabetes.data.csv&quot;, header = FALSE)
+all_x = data[,-c(9)]
+all_y = data[,9]
+
 set.seed(19720816)
 train_len = round(dim(all_x)[1] * 0.8)
 train_index = sample(1:dim(all_x)[1], round(dim(all_x)[1] * 0.8))
+
 train_x = all_x[train_index,]
 train_y = all_y[train_index]
 eval_x = all_x[-train_index,]
 eval_y = all_y[-train_index]</code></pre>
-<p>We first calculate p(y=1) and p(y=0)</p>
-<pre class="r"><code>p_y_1 = length(train_y[train_y == 1]) / train_len
-p_y_0 = 1 - p_y_1</code></pre>
-<p><span class="math display">\[
-\frac{1}{{\sigma \sqrt {2\pi }}}e^-\frac{{\left({x - \mu} \right)^2}}{2\sigma^2}
-\]</span></p>
-<pre class="r"><code>wdat&lt;-read.csv('pima-indians-diabetes.data.csv', header=FALSE)
-library(klaR)</code></pre>
-<pre><code>## Loading required package: MASS</code></pre>
-<pre class="r"><code>library(caret)</code></pre>
-<pre><code>## Warning: package 'caret' was built under R version 3.4.3</code></pre>
-<pre><code>## Loading required package: lattice</code></pre>
-<pre><code>## Loading required package: ggplot2</code></pre>
-<pre><code>## Warning in as.POSIXlt.POSIXct(Sys.time()): unknown timezone 'default/Asia/
-## Shanghai'</code></pre>
-<pre class="r"><code>bigx&lt;-wdat[,-c(9)]
-bigy&lt;-wdat[,9]
-trscore&lt;-array(dim=10)
-tescore&lt;-array(dim=10)
-for (wi in 1:10)
-{wtd&lt;-createDataPartition(y=bigy, p=.8, list=FALSE)
- nbx&lt;-bigx
- ntrbx&lt;-nbx[wtd, ]
- ntrby&lt;-bigy[wtd]
- trposflag&lt;-ntrby&gt;0
- ptregs&lt;-ntrbx[trposflag, ]
- ntregs&lt;-ntrbx[!trposflag,]
- ntebx&lt;-nbx[-wtd, ]
- nteby&lt;-bigy[-wtd]
- ptrmean&lt;-sapply(ptregs, mean, na.rm=TRUE)
- ntrmean&lt;-sapply(ntregs, mean, na.rm=TRUE)
- ptrsd&lt;-sapply(ptregs, sd, na.rm=TRUE)
- ntrsd&lt;-sapply(ntregs, sd, na.rm=TRUE)
- ptroffsets&lt;-t(t(ntrbx)-ptrmean)
- ptrscales&lt;-t(t(ptroffsets)/ptrsd)
- ptrlogs&lt;--(1/2)*rowSums(apply(ptrscales,c(1, 2), function(x)x^2), na.rm=TRUE)-sum(log(ptrsd))
- ntroffsets&lt;-t(t(ntrbx)-ntrmean)
- ntrscales&lt;-t(t(ntroffsets)/ntrsd)
- ntrlogs&lt;--(1/2)*rowSums(apply(ntrscales,c(1, 2), function(x)x^2), na.rm=TRUE)-sum(log(ntrsd))
- lvwtr&lt;-ptrlogs&gt;ntrlogs
- gotrighttr&lt;-lvwtr==ntrby
- trscore[wi]&lt;-sum(gotrighttr)/(sum(gotrighttr)+sum(!gotrighttr))
- pteoffsets&lt;-t(t(ntebx)-ptrmean)
- ptescales&lt;-t(t(pteoffsets)/ptrsd)
- ptelogs&lt;--(1/2)*rowSums(apply(ptescales,c(1, 2), function(x)x^2), na.rm=TRUE)-sum(log(ptrsd))
- nteoffsets&lt;-t(t(ntebx)-ntrmean)
- ntescales&lt;-t(t(nteoffsets)/ntrsd)
- ntelogs&lt;--(1/2)*rowSums(apply(ntescales,c(1, 2), function(x)x^2), na.rm=TRUE)-sum(log(ntrsd))
- lvwte&lt;-ptelogs&gt;ntelogs
- gotright&lt;-lvwte==nteby
- tescore[wi]&lt;-sum(gotright)/(sum(gotright)+sum(!gotright))
+<p>We define a function to train naive Byaes model by calculating p(y=class) and mean and standard deviation of feature variables for each class.</p>
+<pre class="r"><code>gnb.fit = function(features, classes) {
+  model     = list(&quot;p_y&quot;, &quot;mu&quot;,&quot;sigma&quot;)
+  class_val = unique(classes)
+  class_len = length(class_val)
+  y_len     = length(classes)
+
+  p_y       = rep(0, class_len)
+  mu        = array(0, c(class_len, dim(features)[2]))
+  sigma     = array(0, c(class_len, dim(features)[2]))
+  
+  i = 1
+  for (y in class_val) {
+    indexes = classes == y
+    p_y[i]  = length(classes[indexes]) / y_len
+    
+    x         = features[indexes,]
+    mu[i,]    = sapply(x, mean)
+    sigma[i,] = sapply(x, sd)
+
+    i = i + 1 
+  }
+  
+  model$p_y = p_y
+  model$mu = mu
+  model$sigma = sigma
+  
+  return (model)
 }</code></pre>
+<p>We will use formula <span class="math display">\[\sum_jlog(x_j|y_k) + logp(y_k)
+\]</span> to calculate the log probablity of one class <span class="math inline">\(y_k\)</span>. Since we use normal distribution for each feature <span class="math inline">\(x_j\)</span>, the probability of <span class="math inline">\(x_j\)</span> given class <span class="math inline">\(y_k\)</span> thus is <span class="math display">\[
+p(x_j|y_k) = \frac{1}{{\sigma_k \sqrt {2\pi }}}e^-\frac{{\left({x - \mu_k} \right)^2}}{2\sigma_k^2}
+\]</span> Where <span class="math inline">\(\mu_k\)</span> and <span class="math inline">\(\sigma_k\)</span> are mean and stanstard deviation of feature <span class="math inline">\(x_j\)</span> for a given class <span class="math inline">\(y_k\)</span>. They are calculated by function <em>gnb.fit</em>.</p>
+<p>We define a function to predict the class given a model and features.</p>
+<pre class="r"><code>gnb.predict = function(model, x) {
+  class_len = length(model$p_y)
+  y_score = array(0, c(dim(x)[1],class_len))
+  
+  for (i in 1:class_len) {
+    scale       = (t(x)-model$mu[i,])/model$sigma[i,]
+    log_score   = (-1/2) * scale ^ 2 - log(model$sigma[i,] * sqrt(2*pi))
+    y_score[,i] = colSums(log_score) + log(model$p_y[i])
+  }
+  
+  return (max.col(y_score) - 1)
+}</code></pre>
+<p>Let’s try to train and check the accuracy of the classifier on the 20% evaluation data.</p>
+<pre class="r"><code>model = gnb.fit(train_x, train_y)
+pred_y = gnb.predict(model, eval_x)
+
+accuracy = sum(pred_y == eval_y)/length(eval_y)</code></pre>
+<p>We got accuracy: <span class="math inline">\(0.7987013\)</span></p>
 </div>
 
 
