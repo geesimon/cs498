@@ -126,6 +126,7 @@ $(document).ready(function () {
 <li><a href="#part-a">Part A</a></li>
 <li><a href="#part-b">Part B</a></li>
 <li><a href="#part-c">Part C</a></li>
+<li><a href="#part-d">Part D</a></li>
 </ul>
 </div>
 
@@ -185,31 +186,52 @@ p(x_j|y_k) = \frac{1}{{\sigma_k \sqrt {2\pi }}}e^-\frac{{\left({x - \mu_k} \righ
   
   return (max.col(y_score) - 1)
 }</code></pre>
-<p>Let’s train and check the accuracy of the classifier on the 20% evaluation data. We averaged over 10 test train splits.</p>
-<pre class="r"><code>set.seed(19720816)
-test_num = 10
-accuracy = rep(0, test_num)
+<p>Let’s train and check the accuracy of the classifier on the 20% evaluation data. We will do 10-fold cross-validation and select the best model for testing evaluation data.</p>
+<pre class="r"><code>#Do cross validation and return best model
+cross_validation = function(x, y, fold_num) {
+  train_num = length(y)
+  accuracy  = rep(0, fold_num)
+  models    = list()
 
-for (i in 1:test_num){
-  index = sample(1:dim(all_data)[1], round(dim(all_data)[1] * 0.8))
-  train_x = all_data[index,-c(9)]
-  train_y = all_data[index,c(9)]
-  eval_x = all_data[-index,-c(9)]
-  eval_y = all_data[-index, c(9)]
+  valid_num = round(train_num / fold_num)
+  for (i in 1:fold_num){
+    index_from = (i - 1) * valid_num + 1
+    index_to   = i * valid_num + 1
+    if(index_to &gt; train_num) index_to = train_num
+                                                           
+    valid_indexes = index_from : index_to
+    train_x = x[-valid_indexes, ]
+    train_y = y[-valid_indexes]
+    valid_x = x[valid_indexes, ]
+    valid_y = y[valid_indexes]
+    
+    models[[i]] = gnb.fit(train_x, train_y)
+    pred_y = gnb.predict(models[[i]], valid_x)
+    
+    accuracy[i] = sum(pred_y == valid_y) / length(valid_y)
+    #print(accuracy[i])
+  }
   
-  model = gnb.fit(train_x, train_y)
-  pred_y = gnb.predict(model, eval_x)
-  
-  accuracy[i] = sum(pred_y == eval_y)/length(eval_y)
-}</code></pre>
-<p>We got accuracy: <span class="math inline">\(0.7538961\)</span></p>
+  #print(which.max(accuracy))
+  return (models[[which.max(accuracy)]])
+}
+
+set.seed(19720816)
+fold_num = 10
+train_indexes = sample(1:dim(all_data)[1], round(dim(all_data)[1] * 0.8))
+
+best_model = cross_validation(all_data[train_indexes,-c(9)], all_data[train_indexes,c(9)], 10)
+
+test_x = all_data[-train_indexes,-c(9)]
+test_y = all_data[-train_indexes,c(9)]
+pred_y = gnb.predict(best_model, test_x)
+best_accuracy = sum(pred_y == test_y)/length(test_y)</code></pre>
+<p>We got accuracy: <span class="math inline">\(0.8116883\)</span></p>
 </div>
 <div id="part-b" class="section level2">
 <h2>Part B</h2>
 <p>We will adjust our code so that, for attribute 3 (Diastolic blood pressure), attribute 4 (Triceps skin fold thickness), attribute 6 (Body mass index), and attribute 8 (Age), it regards a value of 0 as a missing value when estimating the class-conditional distributions, and the posterior. R uses a special number NA to flag a missing value.</p>
 <pre class="r"><code>all_x_na = all_data
-test_num = 10
-accuracy = rep(0, test_num)
 
 for (i in c(3, 5, 6, 8))
 {
@@ -217,33 +239,50 @@ for (i in c(3, 5, 6, 8))
   all_x_na[index, i] = NA
 }
 
-for (i in 1:test_num){
-  index = sample(1:dim(all_x_na)[1], round(dim(all_x_na)[1] * 0.8))
-  train_x = all_x_na[index,-c(9)]
-  train_y = all_x_na[index,c(9)]
-  eval_x = all_x_na[-index,-c(9)]
-  eval_y = all_x_na[-index, c(9)]
-  
-  model = gnb.fit(train_x, train_y)
-  pred_y = gnb.predict(model, eval_x)
-  
-  accuracy[i] = sum(pred_y == eval_y)/length(eval_y)
-}</code></pre>
-<p>We got accuracy: <span class="math inline">\(0.7577922\)</span>. The result don’t have significant improvement compared with the previous one.</p>
+set.seed(19720816)
+fold_num = 10
+train_indexes = sample(1:dim(all_x_na)[1], round(dim(all_x_na)[1] * 0.8))
+
+best_model = cross_validation(all_x_na[train_indexes,-c(9)], all_x_na[train_indexes,c(9)], 10)
+
+test_x = all_x_na[-train_indexes,-c(9)]
+test_y = all_x_na[-train_indexes,c(9)]
+pred_y = gnb.predict(best_model, test_x)
+best_accuracy = sum(pred_y == test_y)/length(test_y)</code></pre>
+<p>We got accuracy: <span class="math inline">\(0.8051948\)</span>. The result don’t have much difference compared with the previous one.</p>
 </div>
 <div id="part-c" class="section level2">
 <h2>Part C</h2>
 <p>Use the caret and klaR packages to build a naive bayes classifier for this data, assuming that no attribute has a missing value. We will do 10-fold cross-validation and test the accuracy of the classifier on the held out 20%.</p>
-<pre class="r"><code>#library(klaR)
-library(caret)
+<pre class="r"><code>library(caret)
 
-indexes = createDataPartition(y = all_data[, 9], p = 0.8, list = FALSE)
-train_x = all_data[indexes,-c(9)]
-train_y = as.factor(all_data[indexes,c(9)])
+train_indexes = createDataPartition(y = all_data[, 9], p = 0.8, list = FALSE)
+train_x = all_data[train_indexes,-c(9)]
+train_y = as.factor(all_data[train_indexes,c(9)])
 model   = train(train_x, train_y, 'nb', trControl = trainControl(method='cv', number=10))
-teclasses = predict(model,newdata=train_x[-indexes,])
-cm = confusionMatrix(data=teclasses, train_y[-indexes])</code></pre>
-<p>We got accuracy: <span class="math inline">\(0.8196721\)</span></p>
+
+test_x = all_data[-train_indexes,-c(9)]
+test_y = all_data[-train_indexes,c(9)]
+pred_y = predict(model, newdata = test_x)
+accuracy = sum(pred_y == test_y)/length(test_y)</code></pre>
+<p>We got accuracy: <span class="math inline">\(0.7189542\)</span></p>
+</div>
+<div id="part-d" class="section level2">
+<h2>Part D</h2>
+<p>Now we use SVMLight to train and evaluate an SVM to classify this data.</p>
+<pre class="r"><code>library(klaR)
+
+train_indexes = createDataPartition(y = all_data[, 9], p = 0.8, list = FALSE)
+train_x = all_data[train_indexes,-c(9)]
+train_y = all_data[train_indexes,c(9)]
+
+model = svmlight(train_x, train_y, pathsvm=&quot;./svmlight&quot;)
+
+test_x = all_data[-train_indexes,-c(9)]
+test_y = all_data[-train_indexes,c(9)]
+pred_y = predict(model, newdata = test_x)
+accuracy = sum(pred_y$class == test_y)/length(test_y)</code></pre>
+<p>We got accuracy: <span class="math inline">\(0.7581699\)</span></p>
 </div>
 
 
