@@ -18,34 +18,29 @@ We use a normal distribution to model each of the class-conditional distribution
 ```{r}
 #Prepare training and testing data
 library(readr)
-data  = read.csv("pima-indians-diabetes.data.csv", header = FALSE)
-all_x = data[,-c(9)]
-all_y = data[,9]
+all_data  = read.csv("pima-indians-diabetes.data.csv", header = FALSE)
 ```
 
 We define a function to train naive Byaes model by calculating p(y=class) and mean and standard deviation of feature variables for each class.
 
 ```{r}
-gnb.fit = function(features, classes) {
-  model     = list("p_y", "mu","sigma")
-  class_val = unique(classes)
-  class_len = length(class_val)
-  y_len     = length(classes)
+gnb.fit = function(features, labels) {
+  model      = list("p_y", "mu","sigma")
+  class_val  = unique(labels)
+  class_num  = max(class_val) + 1
+  record_num = length(labels)
 
-  p_y       = rep(0, class_len)
-  mu        = array(0, c(class_len, dim(features)[2]))
-  sigma     = array(0, c(class_len, dim(features)[2]))
+  p_y       = rep(0, class_num)
+  mu        = array(0, c(class_num, dim(features)[2]))
+  sigma     = array(0, c(class_num, dim(features)[2]))
   
-  i = 1
   for (y in class_val) {
-    indexes = classes == y
-    p_y[i]  = length(classes[indexes]) / y_len
+    indexes = labels == y
+    p_y[y + 1]  = length(labels[indexes]) / record_num
     
-    x         = features[indexes,]
-    mu[i,]    = sapply(x, mean, na.rm=TRUE)
-    sigma[i,] = sapply(x, sd, na.rm=TRUE)
-
-    i = i + 1 
+    x             = features[indexes,]
+    mu[y + 1,]    = sapply(x, mean, na.rm=TRUE)
+    sigma[y + 1,] = sapply(x, sd, na.rm=TRUE)
   }
   
   model$p_y = p_y
@@ -56,62 +51,81 @@ gnb.fit = function(features, classes) {
 }
 ```
 
-We will use formula,
-$$
-\sum_jlog(x_j|y_k) + logp(y_k)
-$$ 
-to calculate the log probablity of one class $y_k$. Since we use normal distribution for each feature $x_j$, the probability of $x_j$ given class $y_k$ thus is,
+Since we use normal distribution for each feature $x_j$, the probability of $x_j$ given class $y_k$ is given as,
 $$
 p(x_j|y_k) = \frac{1}{{\sigma_k \sqrt {2\pi }}}e^-\frac{{\left({x - \mu_k} \right)^2}}{2\sigma_k^2}
 $$
 where $\mu_k$ and $\sigma_k$ are mean and stanstard deviation of feature $x_j$ for a given class $y_k$. They are calculated by function *gnb.fit*.
 
+To calculate the log probablity of one class $y_k$, we use formula,
+$$
+\sum_jlog(x_j|y_k) + logp(y_k) 
+$$ 
+$$
+= -\sum_j(log\sigma_k + log\sqrt{2\pi} + \frac{\left(x - \mu_k\right)^2}{2\sigma_k^2}) + logp(y_k)
+$$
+Given $log\sqrt{2\pi}$ is contant, we have,
+$$
+\propto -\sum_j(log\sigma_k+ \frac{\left(x - \mu_k\right)^2}{2\sigma_k^2}) + logp(y_k)
+$$ 
+
 We define a function to predict the class given a model and features.
 ```{r}
 gnb.predict = function(model, x) {
-  class_len = length(model$p_y)
-  y_score = array(0, c(dim(x)[1],class_len))
+  class_num = length(model$p_y)
+  y_score = array(0, c(dim(x)[1],class_num))
   
-  for (i in 1:class_len) {
+  for (i in 1:class_num) {
     scale       = (t(x)-model$mu[i,])/model$sigma[i,]
-    log_score   = (-1/2) * scale ^ 2 - log(model$sigma[i,] * sqrt(2*pi))
-    y_score[,i] = colSums(log_score, na.rm = TRUE) + log(model$p_y[i])
+    logs        = -(log(model$sigma[i,]) + (1/2) * scale ^ 2)
+    y_score[,i] = colSums(logs, na.rm = TRUE) + log(model$p_y[i])
   }
   
   return (max.col(y_score) - 1)
 }
 ```
 
-Let's train and check the accuracy of the classifier on the 20% evaluation data.
+Let's train and check the accuracy of the classifier on the 20% evaluation data. We averaged over 10 test train splits.
 
 ```{r}
 set.seed(19720816)
-train_len = round(dim(all_x)[1] * 0.8)
-train_index = sample(1:dim(all_x)[1], round(dim(all_x)[1] * 0.8))
+fold_num = 10
+train_indexes = sample(1:dim(all_data)[1], round(dim(all_data)[1] * 0.8))
 
-#train_x = all_x[train_index,]
-#train_y = all_y[train_index]
-#eval_x = all_x[-train_index,]
-#eval_y = all_y[-train_index]
+accuracy = rep(0, fold_num)
+models = list()
 
-train_x = all_x[1:614,]
-train_y = all_y[1:614]
-eval_x = all_x[615:768,]
-eval_y = all_y[615:768]
+valid_num = round(length(train_indexes) / fold_num)
+for (i in 1:fold_num){
+  index_from = (i - 1) * valid_num + 1
+  index_to   = i * valid_num + 1
+  if(index_to > length(train_indexes)) index_to = length(train_indexes)
+                                                         
+  valid_indexes = index_from : index_to
+  train_x = all_data[train_indexes[-valid_indexes],-c(9)]
+  train_y = all_data[train_indexes[-valid_indexes],c(9)]
+  valid_x = all_data[train_indexes[valid_indexes],-c(9)]
+  valid_y = all_data[train_indexes[valid_indexes], c(9)]
+  
+  m = gnb.fit(train_x, train_y)
+  pred_y = gnb.predict(m, valid_x)
+  
+  accuracy[i] = sum(pred_y == valid_y)/length(valid_y)
+  print(accuracy[i])
+}
 
-model = gnb.fit(train_x, train_y)
-pred_y = gnb.predict(model, eval_x)
 
-accuracy = sum(pred_y == eval_y)/length(eval_y)
 ```
 
-We got accuracy: $`r accuracy`$
+We got accuracy: $`r mean(accuracy)`$
 
 ##Part B
 We will adjust our code so that, for attribute 3 (Diastolic blood pressure), attribute 4 (Triceps skin fold thickness), attribute 6 (Body mass index), and attribute 8 (Age), it regards a value of 0 as a missing value when estimating the class-conditional distributions, and the posterior. R uses a special number NA to flag a missing value. 
 
 ```{r}
-all_x_na = all_x
+all_x_na = all_data
+test_num = 10
+accuracy = rep(0, test_num)
 
 for (i in c(3, 5, 6, 8))
 {
@@ -119,16 +133,38 @@ for (i in c(3, 5, 6, 8))
   all_x_na[index, i] = NA
 }
 
-train_x = all_x_na[1:614,]
-train_y = all_y[1:614]
-eval_x = all_x_na[615:768,]
-eval_y = all_y[615:768]
+for (i in 1:test_num){
+  index = sample(1:dim(all_x_na)[1], round(dim(all_x_na)[1] * 0.8))
+  train_x = all_x_na[index,-c(9)]
+  train_y = all_x_na[index,c(9)]
+  eval_x = all_x_na[-index,-c(9)]
+  eval_y = all_x_na[-index, c(9)]
+  
+  model = gnb.fit(train_x, train_y)
+  pred_y = gnb.predict(model, eval_x)
+  
+  accuracy[i] = sum(pred_y == eval_y)/length(eval_y)
+}
 ```
 
-```{r}
-model = gnb.fit(train_x, train_y)
-pred_y = gnb.predict(model, eval_x)
+We got accuracy: $`r mean(accuracy)`$. The result don't have significant improvement compared with the previous one.
 
-accuracy = sum(pred_y == eval_y)/length(eval_y)
+##Part C
+Use the caret and klaR packages to build a naive bayes classifier for this data, assuming that no attribute has a missing value. We will do 10-fold cross-validation and test the accuracy of the classifier on the held out 20%.
+
+```{r, message=FALSE, warning=FALSE}
+#library(klaR)
+library(caret)
+
+indexes = createDataPartition(y = all_data[, 9], p = 0.8, list = FALSE)
+train_x = all_data[indexes,-c(9)]
+train_y = as.factor(all_data[indexes,c(9)])
+model   = train(train_x, train_y, 'nb', trControl = trainControl(method='cv', number=10))
+
+teclasses = predict(model,newdata=train_x[-indexes,])
+cm = confusionMatrix(data=teclasses, train_y[-indexes])
 ```
-We got accuracy: $`r accuracy`$
+We got accuracy: $`r cm$overall[["Accuracy"]]`$
+
+##Part D
+Now install SVMLight, which you can find at http://svmlight.joachims.org, via the interface in klaR (look for svmlight in the manual) to train and evaluate an SVM to classify this data.
