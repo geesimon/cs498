@@ -1,5 +1,5 @@
 ---
-title: "Homework 1 Problem 1"
+title: "Homework 1"
 author: "CS 498, Spring 2018, Xiaoming Ji"
 date: ''
 output:
@@ -9,6 +9,7 @@ output:
 ---
 
 
+#Problem 1
 
 ##Part A
 Build a simple naive Bayes classifier to classify this data set. We will use 20% of the data for evaluation and the other 80% for training. There are a total of 768 data-points.
@@ -194,3 +195,9 @@ accuracy = sum(pred_y$class == test_y)/length(test_y)
 ```
 
 We got accuracy: $`r accuracy`$
+
+#Problem 2
+
+##Part A
+
+##Part B

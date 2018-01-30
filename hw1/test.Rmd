@@ -114,3 +114,37 @@ errs[wi]<-sum(foo==bigy[-wtd])/(sum(foo==bigy[-wtd])+sum(!(foo==bigy[-wtd])))
 }
 ```
 
+```{r}
+to.read = file("./MNIST/t10k-images-idx3-ubyte", "rb")
+readBin(to.read, integer(), n = 4, endian = "big")
+
+
+for(i in 1:25){
+  m = matrix(readBin(to.read,integer(), size=1, n=28*28, endian="big", signed = FALSE),28,28);
+  image(m[,28:1], col  = gray((255:0)/255))
+}
+
+#Make Stretched bounding box
+
+ss_box = function(img) {
+  col = colSum(img)
+  row = rowSum(img)
+  
+  top    = 0
+  bottom = 0
+  left   = 0
+  right  = 0
+  
+  for (i in col) {
+    if (i != 0 && left == 0) left == i
+    if (i == 0 && right == 0 && left != 0) right = i - 1
+  }
+  for (i in row) {
+    if (i != 0 && top == 0) top == i
+    if (i == 0 && bottom == 0 && top != 0) bottom = i - 1
+  }
+  return (c(top, bottom, left, right))
+}
+
+```
+
