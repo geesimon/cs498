@@ -118,35 +118,48 @@ errs[wi]<-sum(foo==bigy[-wtd])/(sum(foo==bigy[-wtd])+sum(!(foo==bigy[-wtd])))
 to.read = file("./MNIST/t10k-images-idx3-ubyte", "rb")
 readBin(to.read, integer(), n = 4, endian = "big")
 
-
-for(i in 1:25){
-  m = matrix(readBin(to.read,integer(), size=1, n=28*28, endian="big", signed = FALSE),28,28);
-  image(m[,28:1], col  = gray((255:0)/255))
-}
-
 #Make Stretched bounding box
-
 ss_box = function(img) {
   col = colSums(img)
   row = rowSums(img)
   
-  top    = 0
-  bottom = 0
-  left   = 0
-  right  = 0
-  
-  print(col)
-  print(row)
-  for (i in col) {
-    if (i != 0 && left == 0) left == i
-    if (i == 0 && right == 0 && left != 0) right = i - 1
-  }
-  for (i in row) {
-    if (i != 0 && top == 0) top == i
-    if (i == 0 && bottom == 0 && top != 0) bottom = i - 1
-  }
-  return (c(top, bottom, left, right))
+  top = bottom = left = right  = 0
+
+  for (i in 1:length(row)) {if (row[i] != 0) { top = i; break}}
+  for (i in length(row):1) {if (row[i] != 0) { bottom = i; break}}  
+  for (i in 1:length(col)) {if (col[i] != 0) { left = i; break}}
+  for (i in length(col):1) {if (col[i] != 0) { right = i; break}}
+
+  return (img[top:bottom, left:right])
 }
 
+for(i in 1:10000){
+  m = matrix(readBin(to.read,integer(), size=1, n=28*28, endian="big", signed = FALSE),28,28);
+  box = ss_box(m)
+  #m = m[box[1]: box[2], box[3]:box[4]]
+  #image(m[,dim(m)[2]:1], col  = gray((255:0)/255))
+}
+
+```
+```{r}
+
+#source("http://bioconductor.org/biocLite.R")
+#biocLite("EBImage")
+
+resize = function(img, new_size) {
+  new_width = new_size[1]
+  new_height = new_size[2]
+  
+  #img = img[, dim(img)[2]:1]
+  new_img = apply(img, 2, function(y){return (spline(y, n = new_height)$y)})
+  new_img = t(apply(new_img, 1, function(y){return (spline(y, n = new_width)$y)}))
+
+  new_img[new_img < 0] = 0
+  new_img = round(new_img)
+  
+  return (new_img)
+  #V = apply(img, 2, FUN=function(y, x, xout) return(spline(x, )$y), x.new)
+  #V = t(apply(img, 1, FUN=function(y,x,xout) return(spline(x,y,xout=xout)$y), d, y.new))
+}
 ```
 
