@@ -127,14 +127,16 @@ for(i in 1:25){
 #Make Stretched bounding box
 
 ss_box = function(img) {
-  col = colSum(img)
-  row = rowSum(img)
+  col = colSums(img)
+  row = rowSums(img)
   
   top    = 0
   bottom = 0
   left   = 0
   right  = 0
   
+  print(col)
+  print(row)
   for (i in col) {
     if (i != 0 && left == 0) left == i
     if (i == 0 && right == 0 && left != 0) right = i - 1
