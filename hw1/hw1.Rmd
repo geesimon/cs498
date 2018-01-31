@@ -197,6 +197,93 @@ accuracy = sum(pred_y$class == test_y)/length(test_y)
 We got accuracy: $`r accuracy`$
 
 #Problem 2
+We make a function to construct a bounding box so that the horizontal (resp. vertical) range of ink pixels runs the full horizontal (resp. vertical) range of the box.
+
+```{r}
+#Stretch image to new size
+stretch_image = function(img, new_width, new_height) {
+  new_img = apply(img, 2, function(y){return (spline(y, n = new_height)$y)})
+  new_img = t(apply(new_img, 1, function(y){return (spline(y, n = new_width)$y)}))
+
+  new_img[new_img < 0] = 0
+  new_img = round(new_img)
+  
+  return (new_img)
+}
+
+#Make stretched bounding box
+sb_box = function(img, box_width, box_height) {
+  col = colSums(img)
+  row = rowSums(img)
+
+  #Calculate image boundary  
+  top = bottom = left = right  = 0
+
+  for (i in 1:length(row)) {if (row[i] != 0) { top = i; break}}
+  for (i in length(row):1) {if (row[i] != 0) { bottom = i; break}}  
+  for (i in 1:length(col)) {if (col[i] != 0) { left = i; break}}
+  for (i in length(col):1) {if (col[i] != 0) { right = i; break}}
+
+  if(top >= bottom || left >= right){stop("bad image")}
+  
+  box_img = img[top:bottom, left:right]
+  
+  top    = (dim(img)[1] - box_height) / 2 + 1
+  bottom = top + box_height - 1
+  left   = (dim(img)[2] - box_width) / 2 + 1
+  right  = left + box_width - 1
+  
+  #Draw box
+  ss_img = array(0, dim(img))
+  ss_img[top - 1, (left - 1) : (right + 1)]    = 255
+  ss_img[bottom + 1, (left - 1) : (right + 1)] = 255
+  ss_img[(top - 1): (bottom + 1), (left - 1)]    = 255
+  ss_img[(top - 1): (bottom + 1), (right + 1)]   = 255
+  
+  ss_img[top:bottom, left:right] = (stretch_image(box_img, box_width, box_height))
+  
+  #Thresholding
+  ss_img[ss_img > 128] = 255
+  ss_img[ss_img <= 128] = 0
+  
+  return (ss_img)
+}
+```
+
+```{r}
+#to.read = file("./MNIST/t10k-images-idx3-ubyte", "rb")
+mnist_file = gzfile("./MNIST/t10k-images-idx3-ubyte.gz", "rb")
+ss_mnist_file = gzfile("./MNIST/t10k-images-idx3-ubyte-sb.gz", "wb")
+
+writeBin(readBin(mnist_file, integer(), n = 4,  endian = "big"), ss_mnist_file)
+
+for(i in 1:10){
+  m = matrix(readBin(mnist_file, integer(), size = 1, n = 28*28, endian = "big", signed = FALSE), 28, 28);
+  
+  box = ss_box(m, 20, 20)
+  writeBin(c(box), ss_mnist_file, endian = "big")
+  #image(m[,dim(m)[2]:1], col  = gray((255:0)/255))
+  image(box[,dim(box)[2]:1], col  = gray((255:0)/255))
+}
+
+close(mnist_file)
+close(ss_mnist_file)
+```
+
+```{r}
+ss_mnist_file = gzfile("./MNIST/t10k-images-idx3-ubyte-sb.gz", "rb")
+readBin(ss_mnist_file, integer(), n = 4,  endian = "big")
+
+for(i in 1:10){
+  m = matrix(readBin(ss_mnist_file, integer(), size = 1, n = 28*28, endian = "big", signed = FALSE), 28, 28);
+  
+  #box = ss_box(m, 20, 20)
+  #writeBin(c(box), ss_mnist_file)
+  image(m[,dim(m)[2]:1], col  = gray((255:0)/255))
+  #image(box[,dim(box)[2]:1], col  = gray((255:0)/255))
+}
+
+```
 
 ##Part A
 
