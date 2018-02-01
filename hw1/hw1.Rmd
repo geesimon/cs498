@@ -32,8 +32,8 @@ gnb.fit = function(features, labels) {
   record_num = length(labels)
 
   p_y       = rep(0, class_num)
-  mu        = array(0, c(class_num, dim(features)[2]))
-  sigma     = array(0, c(class_num, dim(features)[2]))
+  mu        = matrix(0, class_num, dim(features)[2])
+  sigma     = matrix(0, class_num, dim(features)[2])
   
   for (y in class_val) {
     indexes = labels == y
@@ -47,6 +47,29 @@ gnb.fit = function(features, labels) {
   model$p_y = p_y
   model$mu = mu
   model$sigma = sigma
+  
+  return (model)
+}
+
+bnb.fit = function(features, labels) {
+  model = list("p_y", "p_x")
+  class_val  = unique(labels)
+  class_num  = max(class_val) + 1
+  record_num = length(labels)
+  
+  p_y = rep(0, class_num)
+  p_x = matrix(0, class_num, dim(features)[2])
+  
+  for (y in class_val){
+    indexes = labels == y
+    p_y[y + 1]  = length(labels[indexes]) / record_num
+    
+    x           = features[indexes,]
+    p_x[y + 1,] = colSums(x > 0) / length(indexes)
+  }
+  
+  model$p_y = p_y
+  model$p_x = p_x
   
   return (model)
 }
@@ -74,7 +97,7 @@ We define a function to predict the class given a model and features.
 ```{r}
 gnb.predict = function(model, x) {
   class_num = length(model$p_y)
-  y_score = array(0, c(dim(x)[1],class_num))
+  y_score = matrix(0, dim(x)[1],class_num)
   
   for (i in 1:class_num) {
     scale       = (t(x)-model$mu[i,])/model$sigma[i,]
@@ -84,16 +107,23 @@ gnb.predict = function(model, x) {
   
   return (max.col(y_score) - 1)
 }
+
+bnb.predict = function(model, x) {
+}
 ```
 
 Let's train and check the accuracy of the classifier on the 20% evaluation data. We will do 10-fold cross-validation and select the best model for testing evaluation data.
 
 ```{r}
 #Do cross validation and return best model
-cross_validation = function(x, y, fold_num) {
+cross_validation = function(x, y, fold_num, method = "Gaussian") {
+  func_map = list("Gaussian" = list(fit = gnb.fit, predict = gnb.predict), 
+                  "Bernoulli" = list(fit = bnb.fit, predict = bnb.predict))
+  
   train_num = length(y)
   accuracy  = rep(0, fold_num)
   models    = list()
+
 
   valid_num = round(train_num / fold_num)
   for (i in 1:fold_num){
@@ -107,8 +137,10 @@ cross_validation = function(x, y, fold_num) {
     valid_x = x[valid_indexes, ]
     valid_y = y[valid_indexes]
     
-    models[[i]] = gnb.fit(train_x, train_y)
-    pred_y = gnb.predict(models[[i]], valid_x)
+    #models[[i]] = gnb.fit(train_x, train_y)
+    models[[i]] = func_map[[method]]$fit(train_x, train_y)
+    #pred_y = gnb.predict(models[[i]], valid_x)
+    pred_y = func_map[[method]]$predict(models[[i]], valid_x)
     
     accuracy[i] = sum(pred_y == valid_y) / length(valid_y)
     #print(accuracy[i])
@@ -304,7 +336,7 @@ load_image_data = function(file_name){
   }
   close(img_file)
   
-  return (as.data.frame(data))
+  return (data)
 }
 
 load_label_data = function(file_name){
@@ -318,11 +350,11 @@ load_label_data = function(file_name){
   return (data)
 }
 
-  training_data = load_image_data("./MNIST/train-images-idx3-ubyte")
+  train_data = load_image_data("./MNIST/train-images-idx3-ubyte")
   test_data = load_image_data("./MNIST/t10k-images-idx3-ubyte")
-  sb_training_data = load_image_data("./MNIST/train-images-idx3-ubyte-sb")
+  sb_train_data = load_image_data("./MNIST/train-images-idx3-ubyte-sb")
   sb_test_data = load_image_data("./MNIST/t10k-images-idx3-ubyte-sb")
-  training_label = load_label_data("./MNIST/train-labels-idx1-ubyte")
+  train_label = load_label_data("./MNIST/train-labels-idx1-ubyte")
   test_label = load_label_data("./MNIST/t10k-labels-idx1-ubyte")
 ```
 
@@ -334,24 +366,38 @@ par(mar = c(0,0,0,0))
 index = sample(1:60000, 10)
 for(i in index)
 {
-  image(matrix(training_data[i,], 28, 28)[, 28:1], col  = gray((255:0)/255))
+  image(matrix(train_data[i,], 28, 28)[, 28:1], col  = gray((255:0)/255))
 }
 
 for(i in index)
 {
-  image(matrix(sb_training_data[i,], 28, 28)[, 28:1], col  = gray((255:0)/255))
+  image(matrix(sb_train_data[i,], 28, 28)[, 28:1], col  = gray((255:0)/255))
 }
 ```
 
 
 ##Part A
-Investigate classifying MNIST using naive Bayes. Fill in the accuracy values for the four combinations of Gaussian v. Bernoulli distributions and untouched images v. stretched bounding boxes. Please use 20 x 20 for your bounding box dimensions.
+Investigate classifying MNIST using naive Bayes. Fill in the accuracy values for the four combinations of Gaussian v. Bernoulli distributions and untouched images v. stretched bounding boxes. We use 20 x 20 for your bounding box dimensions.
 
 ```{r}
-library(caret)
+train_data = as.data.frame(train_data)
+sb_train_data = as.data.frame(sb_train_data)
 
-model = train(training_data, training_label, 'nb', trControl = trainControl(method='cv', number=5))
+best_model = cross_validation(train_data, train_label, 5)
+pred_y = gnb.predict(best_model, test_data)
+gaussian_accuracy = sum(pred_y == test_label)/length(test_label)
 
+best_model = cross_validation(sb_train_data, train_label, 5)
+pred_y = gnb.predict(best_model, sb_test_data)
+gaussian_sb_accuracy = sum(pred_y == test_label)/length(test_label)
+
+best_model = cross_validation(train_data, train_label, 5, method = "Bernoulli")
+pred_y = gnb.predict(best_model, test_data)
+bernoulli_accuracy = sum(pred_y == test_label)/length(test_label)
+
+best_model = cross_validation(sb_train_data, train_label, 5, method = "Bernoulli")
+pred_y = gnb.predict(best_model, sb_test_data)
+bernoulli_sb_accuracy = sum(pred_y == test_label)/length(test_label)
 ```
 
 
