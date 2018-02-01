@@ -216,7 +216,7 @@ sb_box = function(img, box_width, box_height) {
   col = colSums(img)
   row = rowSums(img)
 
-  #Calculate image boundary  
+  #Calculate image boundary and extract the bounding image
   top = bottom = left = right  = 0
 
   for (i in 1:length(row)) {if (row[i] != 0) { top = i; break}}
@@ -228,19 +228,25 @@ sb_box = function(img, box_width, box_height) {
   
   box_img = img[top:bottom, left:right]
   
+  
   top    = (dim(img)[1] - box_height) / 2 + 1
   bottom = top + box_height - 1
   left   = (dim(img)[2] - box_width) / 2 + 1
   right  = left + box_width - 1
+
+  ss_img = array(0, dim(img))
+  ss_img[top:bottom, left:right] = (stretch_image(box_img, box_width, box_height))
   
   #Draw box
-  ss_img = array(0, dim(img))
-  ss_img[top - 1, (left - 1) : (right + 1)]    = 255
-  ss_img[bottom + 1, (left - 1) : (right + 1)] = 255
-  ss_img[(top - 1): (bottom + 1), (left - 1)]    = 255
-  ss_img[(top - 1): (bottom + 1), (right + 1)]   = 255
+  #ss_img[top, (left - 1) : (right + 1)]    = 255
+  #ss_img[bottom + 1, (left - 1) : (right + 1)] = 255
+  #ss_img[(top - 1): (bottom + 1), (left - 1)]    = 255
+  #ss_img[(top - 1): (bottom + 1), (right + 1)]   = 255
+  ss_img[top, left:right]    = 255
+  ss_img[bottom, left: right] = 255
+  ss_img[top: bottom, left]    = 255
+  ss_img[top: bottom, right]   = 255
   
-  ss_img[top:bottom, left:right] = (stretch_image(box_img, box_width, box_height))
   
   #Thresholding
   ss_img[ss_img > 128] = 255
@@ -250,7 +256,7 @@ sb_box = function(img, box_width, box_height) {
 }
 ```
 
-To improve performance, we process the original images and save the stretched bounding box images to files. 
+To improve performance for repetitive experiment, we process the original images and save the stretched bounding box images to files. 
 
 ```{r, eval=FALSE}
 process_save = function(input_gzfile_name, output_file_name) {
@@ -281,22 +287,24 @@ process_save("./MNIST/train-images-idx3-ubyte", "./MNIST/train-images-idx3-ubyte
 process_save("./MNIST/t10k-images-idx3-ubyte", "./MNIST/t10k-images-idx3-ubyte-sb")
 ```
 
-Load data from saved file
+Load data from saved file.
 ```{r}
 load_image_data = function(file_name){
   img_file = file(file_name, "rb")
   header = readBin(img_file, integer(), n = 4,  endian = "big")
   
-  data = list()
+  data = matrix(0, header[2], 28 * 28)
+  #data = list()
   for (i in 1:header[2]) {
     img = readBin(img_file, integer(), size = 1, n = 28*28, endian = "big", 
                    signed = FALSE)
     if(length(img) != 28*28) break
-    data[[i]] = img
+    data[i,] = img
+    #data[[i]] = img
   }
   close(img_file)
   
-  return (data)
+  return (as.data.frame(data))
 }
 
 load_label_data = function(file_name){
@@ -319,23 +327,32 @@ load_label_data = function(file_name){
 ```
 
 Let's show some images for both untouched and stredched bounding box.
-```{r}
+```{r, echo=FALSE}
 par(mfrow=c(2,5))
 par(mar = c(0,0,0,0))
 
 index = sample(1:60000, 10)
 for(i in index)
 {
-  image(matrix(training_data[[i]], 28, 28)[, 28:1], col  = gray((255:0)/255))
+  image(matrix(training_data[i,], 28, 28)[, 28:1], col  = gray((255:0)/255))
 }
 
 for(i in index)
 {
-  image(matrix(sb_training_data[[i]], 28, 28)[, 28:1], col  = gray((255:0)/255))
+  image(matrix(sb_training_data[i,], 28, 28)[, 28:1], col  = gray((255:0)/255))
 }
 ```
 
 
 ##Part A
+Investigate classifying MNIST using naive Bayes. Fill in the accuracy values for the four combinations of Gaussian v. Bernoulli distributions and untouched images v. stretched bounding boxes. Please use 20 x 20 for your bounding box dimensions.
+
+```{r}
+library(caret)
+
+model = train(training_data, training_label, 'nb', trControl = trainControl(method='cv', number=5))
+
+```
+
 
 ##Part B
