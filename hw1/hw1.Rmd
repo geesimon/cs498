@@ -250,40 +250,91 @@ sb_box = function(img, box_width, box_height) {
 }
 ```
 
-```{r}
-#to.read = file("./MNIST/t10k-images-idx3-ubyte", "rb")
-mnist_file = gzfile("./MNIST/t10k-images-idx3-ubyte.gz", "rb")
-ss_mnist_file = gzfile("./MNIST/t10k-images-idx3-ubyte-sb.gz", "wb")
+To improve performance, we process the original images and save the stretched bounding box images to files. 
 
-writeBin(readBin(mnist_file, integer(), n = 4,  endian = "big"), ss_mnist_file)
+```{r, eval=FALSE}
+process_save = function(input_gzfile_name, output_file_name) {
+  input_gzfile = file(input_gzfile_name, "rb")
+  output_file = file(output_file_name, "wb")
 
-for(i in 1:10){
-  m = matrix(readBin(mnist_file, integer(), size = 1, n = 28*28, endian = "big", signed = FALSE), 28, 28);
+  header = readBin(input_gzfile, integer(), n = 4,  endian = "big")
+  writeBin(header, output_file, endian = "big")
   
-  box = ss_box(m, 20, 20)
-  writeBin(c(box), ss_mnist_file, endian = "big")
-  #image(m[,dim(m)[2]:1], col  = gray((255:0)/255))
-  image(box[,dim(box)[2]:1], col  = gray((255:0)/255))
+  sb_images = list()
+  original_images = list()
+  
+  for (i in 1:header[2]) {
+    data = readBin(input_gzfile, integer(), size = 1, n = 28*28, endian = "big", 
+                   signed = FALSE)
+    if(length(data) != 28*28) break
+    original_images[[i]] = matrix(data, 28, 28);
+    
+    sb_images[[i]] = sb_box(original_images[[i]], 20, 20)
+    writeBin(as.integer(sb_images[[i]]), output_file, size = 1)
+  }
+
+  close(input_gzfile)
+  close(output_file)
 }
 
-close(mnist_file)
-close(ss_mnist_file)
+process_save("./MNIST/train-images-idx3-ubyte", "./MNIST/train-images-idx3-ubyte-sb")
+process_save("./MNIST/t10k-images-idx3-ubyte", "./MNIST/t10k-images-idx3-ubyte-sb")
 ```
 
+Load data from saved file
 ```{r}
-ss_mnist_file = gzfile("./MNIST/t10k-images-idx3-ubyte-sb.gz", "rb")
-readBin(ss_mnist_file, integer(), n = 4,  endian = "big")
-
-for(i in 1:10){
-  m = matrix(readBin(ss_mnist_file, integer(), size = 1, n = 28*28, endian = "big", signed = FALSE), 28, 28);
+load_image_data = function(file_name){
+  img_file = file(file_name, "rb")
+  header = readBin(img_file, integer(), n = 4,  endian = "big")
   
-  #box = ss_box(m, 20, 20)
-  #writeBin(c(box), ss_mnist_file)
-  image(m[,dim(m)[2]:1], col  = gray((255:0)/255))
-  #image(box[,dim(box)[2]:1], col  = gray((255:0)/255))
+  data = list()
+  for (i in 1:header[2]) {
+    img = readBin(img_file, integer(), size = 1, n = 28*28, endian = "big", 
+                   signed = FALSE)
+    if(length(img) != 28*28) break
+    data[[i]] = img
+  }
+  close(img_file)
+  
+  return (data)
 }
 
+load_label_data = function(file_name){
+  label_file = file(file_name, "rb")
+  header = readBin(label_file, integer(), n = 2,  endian = "big")
+  
+  data = readBin(label_file, integer(), size = 1, n = header[2], endian = "big", 
+                   signed = FALSE)
+  close(label_file)
+  
+  return (data)
+}
+
+  training_data = load_image_data("./MNIST/train-images-idx3-ubyte")
+  test_data = load_image_data("./MNIST/t10k-images-idx3-ubyte")
+  sb_training_data = load_image_data("./MNIST/train-images-idx3-ubyte-sb")
+  sb_test_data = load_image_data("./MNIST/t10k-images-idx3-ubyte-sb")
+  training_label = load_label_data("./MNIST/train-labels-idx1-ubyte")
+  test_label = load_label_data("./MNIST/t10k-labels-idx1-ubyte")
 ```
+
+Let's show some images for both untouched and stredched bounding box.
+```{r}
+par(mfrow=c(2,5))
+par(mar = c(0,0,0,0))
+
+index = sample(1:60000, 10)
+for(i in index)
+{
+  image(matrix(training_data[[i]], 28, 28)[, 28:1], col  = gray((255:0)/255))
+}
+
+for(i in index)
+{
+  image(matrix(sb_training_data[[i]], 28, 28)[, 28:1], col  = gray((255:0)/255))
+}
+```
+
 
 ##Part A
 
