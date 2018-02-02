@@ -25,6 +25,7 @@ all_data  = read.csv("pima-indians-diabetes.data.csv", header = FALSE)
 We define a function to train naive Byaes model by calculating p(y=class) and mean and standard deviation of feature variables for each class.
 
 ```{r}
+#Gaussian model
 gnb.fit = function(features, labels) {
   model      = list("p_y", "mu","sigma")
   class_val  = unique(labels)
@@ -51,6 +52,7 @@ gnb.fit = function(features, labels) {
   return (model)
 }
 
+#Bernoulli model
 bnb.fit = function(features, labels) {
   model = list("p_y", "p_x")
   class_val  = unique(labels)
@@ -115,8 +117,8 @@ bnb.predict = function(model, x) {
 Let's train and check the accuracy of the classifier on the 20% evaluation data. We will do 10-fold cross-validation and select the best model for testing evaluation data.
 
 ```{r}
-#Do cross validation and return best model
-cross_validation = function(x, y, fold_num, method = "Gaussian") {
+#Cross validate and return best model
+cross_validation = function(x, y, fold_num, model = "Gaussian") {
   func_map = list("Gaussian" = list(fit = gnb.fit, predict = gnb.predict), 
                   "Bernoulli" = list(fit = bnb.fit, predict = bnb.predict))
   
@@ -137,10 +139,8 @@ cross_validation = function(x, y, fold_num, method = "Gaussian") {
     valid_x = x[valid_indexes, ]
     valid_y = y[valid_indexes]
     
-    #models[[i]] = gnb.fit(train_x, train_y)
-    models[[i]] = func_map[[method]]$fit(train_x, train_y)
-    #pred_y = gnb.predict(models[[i]], valid_x)
-    pred_y = func_map[[method]]$predict(models[[i]], valid_x)
+    models[[i]] = func_map[[model]]$fit(train_x, train_y)
+    pred_y = func_map[[model]]$predict(models[[i]], valid_x)
     
     accuracy[i] = sum(pred_y == valid_y) / length(valid_y)
     #print(accuracy[i])
@@ -238,6 +238,7 @@ stretch_image = function(img, new_width, new_height) {
   new_img = t(apply(new_img, 1, function(y){return (spline(y, n = new_width)$y)}))
 
   new_img[new_img < 0] = 0
+  new_img[new_img > 255] = 255
   new_img = round(new_img)
   
   return (new_img)
@@ -279,10 +280,9 @@ sb_box = function(img, box_width, box_height) {
   ss_img[top: bottom, left]    = 255
   ss_img[top: bottom, right]   = 255
   
-  
   #Thresholding
-  ss_img[ss_img > 128] = 255
-  ss_img[ss_img <= 128] = 0
+  #ss_img[ss_img > 128] = 255
+  #ss_img[ss_img <= 128] = 0
   
   return (ss_img)
 }
@@ -356,11 +356,20 @@ load_label_data = function(file_name){
   sb_test_data = load_image_data("./MNIST/t10k-images-idx3-ubyte-sb")
   train_label = load_label_data("./MNIST/train-labels-idx1-ubyte")
   test_label = load_label_data("./MNIST/t10k-labels-idx1-ubyte")
+  
+  #Threshhold image to make it binary value (ink and paper)
+  sb_bin_train_data = sb_train_data
+  sb_bin_test_data  = sb_test_data
+  
+  sb_bin_train_data[sb_bin_train_data > 128] = 255
+  sb_bin_train_data[sb_bin_train_data <= 128] = 0
+  sb_bin_test_data[sb_bin_test_data > 128] = 255
+  sb_bin_test_data[sb_bin_test_data <= 128] = 0
 ```
 
 Let's show some images for both untouched and stredched bounding box.
 ```{r, echo=FALSE}
-par(mfrow=c(2,5))
+par(mfrow=c(6,5))
 par(mar = c(0,0,0,0))
 
 index = sample(1:60000, 10)
@@ -373,6 +382,11 @@ for(i in index)
 {
   image(matrix(sb_train_data[i,], 28, 28)[, 28:1], col  = gray((255:0)/255))
 }
+
+for(i in index)
+{
+  image(matrix(sb_bin_train_data[i,], 28, 28)[, 28:1], col  = gray((255:0)/255))
+}
 ```
 
 
@@ -382,6 +396,7 @@ Investigate classifying MNIST using naive Bayes. Fill in the accuracy values for
 ```{r}
 train_data = as.data.frame(train_data)
 sb_train_data = as.data.frame(sb_train_data)
+sb_bin_train_data = as.data.frame(sb_bin_train_data)
 
 best_model = cross_validation(train_data, train_label, 5)
 pred_y = gnb.predict(best_model, test_data)
@@ -391,14 +406,18 @@ best_model = cross_validation(sb_train_data, train_label, 5)
 pred_y = gnb.predict(best_model, sb_test_data)
 gaussian_sb_accuracy = sum(pred_y == test_label)/length(test_label)
 
-best_model = cross_validation(train_data, train_label, 5, method = "Bernoulli")
-pred_y = gnb.predict(best_model, test_data)
-bernoulli_accuracy = sum(pred_y == test_label)/length(test_label)
+best_model = cross_validation(sb_bin_train_data, train_label, 5)
+pred_y = gnb.predict(best_model, sb_bin_test_data)
+bin_gaussian_sb_accuracy = sum(pred_y == test_label)/length(test_label)
 
-best_model = cross_validation(sb_train_data, train_label, 5, method = "Bernoulli")
-pred_y = gnb.predict(best_model, sb_test_data)
-bernoulli_sb_accuracy = sum(pred_y == test_label)/length(test_label)
+#best_model = cross_validation(train_data, train_label, 5, model = "Bernoulli")
+#pred_y = gnb.predict(best_model, test_data)
+#bernoulli_accuracy = sum(pred_y == test_label)/length(test_label)
+
+#best_model = cross_validation(sb_train_data, train_label, 5, model = "Bernoulli")
+#pred_y = gnb.predict(best_model, sb_test_data)
+#bernoulli_sb_accuracy = sum(pred_y == test_label)/length(test_label)
 ```
 
-
 ##Part B
+
