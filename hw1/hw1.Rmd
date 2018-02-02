@@ -381,7 +381,7 @@ load_label_data = function(file_name){
   sb_bin_test_data[sb_bin_test_data > 128] = 1
 ```
 
-Let's show some images for both untouched and stredched bounding box.
+Let's show some images for untouched, stredched bounding box and threshholed.
 ```{r, echo=FALSE}
 par(mfrow=c(6,5))
 par(mar = c(0,0,0,0))
