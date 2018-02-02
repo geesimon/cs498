@@ -111,6 +111,14 @@ gnb.predict = function(model, x) {
 }
 
 bnb.predict = function(model, x) {
+    class_num = length(model$p_y)
+    y_score = matrix(0, dim(x)[1], class_num)
+    for (i in 1:class_num){
+      logs = t(x) * log(model$p_x[i,]) + t(1 - x) * log(1 - model$p_x[i,])
+      y_score[,i] =  colSums(logs, na.rm = TRUE)+ log(model$p_y[i])
+    }
+    
+    return (max.col(y_score) - 1)
 }
 ```
 
@@ -358,13 +366,19 @@ load_label_data = function(file_name){
   test_label = load_label_data("./MNIST/t10k-labels-idx1-ubyte")
   
   #Threshhold image to make it binary value (ink and paper)
+  bin_train_data = train_data
+  bin_test_data = test_data
+  bin_train_data[bin_train_data <= 128] = 0
+  bin_train_data[bin_train_data > 128] = 1
+  bin_test_data[bin_test_data <= 128] = 0
+  bin_test_data[bin_test_data > 128] = 1
+  
   sb_bin_train_data = sb_train_data
   sb_bin_test_data  = sb_test_data
-  
-  sb_bin_train_data[sb_bin_train_data > 128] = 255
   sb_bin_train_data[sb_bin_train_data <= 128] = 0
-  sb_bin_test_data[sb_bin_test_data > 128] = 255
+  sb_bin_train_data[sb_bin_train_data > 128] = 1
   sb_bin_test_data[sb_bin_test_data <= 128] = 0
+  sb_bin_test_data[sb_bin_test_data > 128] = 1
 ```
 
 Let's show some images for both untouched and stredched bounding box.
@@ -385,39 +399,56 @@ for(i in index)
 
 for(i in index)
 {
-  image(matrix(sb_bin_train_data[i,], 28, 28)[, 28:1], col  = gray((255:0)/255))
+  image(matrix(sb_bin_train_data[i,], 28, 28)[, 28:1], col  = gray((1:0)/1))
 }
 ```
 
 
 ##Part A
-Investigate classifying MNIST using naive Bayes. Fill in the accuracy values for the four combinations of Gaussian v. Bernoulli distributions and untouched images v. stretched bounding boxes. We use 20 x 20 for your bounding box dimensions.
+Investigate classifying MNIST using naive Bayes. We use 20 x 20 for your bounding box dimensions.
 
 ```{r}
 train_data = as.data.frame(train_data)
+bin_train_data = as.data.frame(bin_train_data)
 sb_train_data = as.data.frame(sb_train_data)
 sb_bin_train_data = as.data.frame(sb_bin_train_data)
 
-best_model = cross_validation(train_data, train_label, 5)
+best_model = cross_validation(train_data, train_label, 10)
 pred_y = gnb.predict(best_model, test_data)
 gaussian_accuracy = sum(pred_y == test_label)/length(test_label)
 
-best_model = cross_validation(sb_train_data, train_label, 5)
+best_model = cross_validation(bin_train_data, train_label, 10)
+pred_y = gnb.predict(best_model, bin_test_data)
+bin_gaussian_accuracy = sum(pred_y == test_label)/length(test_label)
+
+best_model = cross_validation(sb_train_data, train_label, 10)
 pred_y = gnb.predict(best_model, sb_test_data)
 gaussian_sb_accuracy = sum(pred_y == test_label)/length(test_label)
 
-best_model = cross_validation(sb_bin_train_data, train_label, 5)
+best_model = cross_validation(sb_bin_train_data, train_label, 10)
 pred_y = gnb.predict(best_model, sb_bin_test_data)
 bin_gaussian_sb_accuracy = sum(pred_y == test_label)/length(test_label)
 
-#best_model = cross_validation(train_data, train_label, 5, model = "Bernoulli")
-#pred_y = gnb.predict(best_model, test_data)
-#bernoulli_accuracy = sum(pred_y == test_label)/length(test_label)
+best_model = cross_validation(bin_train_data, train_label, 10, model = "Bernoulli")
+pred_y = bnb.predict(best_model, bin_test_data)
+bernoulli_accuracy = sum(pred_y == test_label)/length(test_label)
 
-#best_model = cross_validation(sb_train_data, train_label, 5, model = "Bernoulli")
-#pred_y = gnb.predict(best_model, sb_test_data)
-#bernoulli_sb_accuracy = sum(pred_y == test_label)/length(test_label)
+best_model = cross_validation(sb_bin_train_data, train_label, 10, model = "Bernoulli")
+pred_y = bnb.predict(best_model, sb_bin_test_data)
+bernoulli_sb_accuracy = sum(pred_y == test_label)/length(test_label)
 ```
 
+The accuracy values for the six combinations of Gaussian (original and thresholding) v. Bernoulli distributions and untouched images v. stretched bounding boxes. 
+
+|   Accuracy            | Gaussian                 |Gaussian (Thresholding)         | Bernoulli                 |
+|-----------------------|--------------------------|-----------------------------|---------------------------|
+|untouched images       | $`r gaussian_accuracy`$  | $`r bin_gaussian_accuracy`$| $`r bernoulli_accuracy`$ |
+|stretched bounding box | $`r gaussian_sb_accuracy`$| $`r bin_gaussian_sb_accuracy`$ | $`r bernoulli_sb_accuracy`$|
+
+
+- From the results, we can see Bernoulli distribution is better for untouched pixels and Gaussian distribution is better for stretched bounding box images.
+- We also notice that Gaussian distribution used against (unthresholded) streched bounding box gives us the best result $`r gaussian_sb_accuracy`$.
+
 ##Part B
+Investigate classifying MNIST using a decision forest. For this you should use a library. For your forest construction, try out and compare the combinations of parameters shown in the table (i.e. depth of tree, number of trees, etc.) by listing the accuracy for each of the following cases: untouched raw pixels; stretched bounding box. Please use 20 x 20 for your bounding box dimensions.
 
