@@ -452,3 +452,7 @@ The accuracy values for the six combinations of Gaussian (original and threshold
 ##Part B
 Investigate classifying MNIST using a decision forest. For this you should use a library. For your forest construction, try out and compare the combinations of parameters shown in the table (i.e. depth of tree, number of trees, etc.) by listing the accuracy for each of the following cases: untouched raw pixels; stretched bounding box. Please use 20 x 20 for your bounding box dimensions.
 
+```{r}
+
+```
+
