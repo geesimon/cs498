@@ -183,4 +183,61 @@ for(i in 1:10000){
 close(mnist_file)
 ```
 
+```{r}
+
+sb = function(img, box_width, box_height) {
+  col = colSums(img)
+  row = rowSums(img)
+
+  #Calculate image boundary and extract the bounding image
+  top = bottom = left = right  = 0
+
+  for (i in 1:length(row)) {if (row[i] != 0) { top = i; break}}
+  for (i in length(row):1) {if (row[i] != 0) { bottom = i; break}}  
+  for (i in 1:length(col)) {if (col[i] != 0) { left = i; break}}
+  for (i in length(col):1) {if (col[i] != 0) { right = i; break}}
+
+  if(top >= bottom || left >= right){stop("bad image")}
+  
+  box_img = img[top:bottom, left:right]
+  
+  
+  top    = (dim(img)[1] - box_height) / 2 + 1
+  bottom = top + box_height - 1
+  left   = (dim(img)[2] - box_width) / 2 + 1
+  right  = left + box_width - 1
+
+  ss_img = array(0, dim(img))
+  ss_img[top:bottom, left:right] = (stretch_image(box_img, box_width, box_height))
+  
+  return (ss_img)
+}
+
+process_save = function(input_gzfile_name, output_file_name) {
+  input_gzfile = file(input_gzfile_name, "rb")
+  output_file = file(output_file_name, "wb")
+
+  header = readBin(input_gzfile, integer(), n = 4,  endian = "big")
+  writeBin(header, output_file, endian = "big")
+  
+  sb_images = list()
+  original_images = list()
+  
+  for (i in 1:header[2]) {
+    data = readBin(input_gzfile, integer(), size = 1, n = 28*28, endian = "big", 
+                   signed = FALSE)
+    if(length(data) != 28*28) break
+    original_images[[i]] = matrix(data, 28, 28);
+    
+    sb_images[[i]] = sb(original_images[[i]], 20, 20)
+    writeBin(as.integer(sb_images[[i]]), output_file, size = 1)
+  }
+
+  close(input_gzfile)
+  close(output_file)
+}
+
+process_save("./MNIST/train-images-idx3-ubyte", "./MNIST/train-images-idx3-ubyte-sb")
+process_save("./MNIST/t10k-images-idx3-ubyte", "./MNIST/t10k-images-idx3-ubyte-sb")
+```
 

@@ -22,7 +22,7 @@ library(readr)
 all_data  = read.csv("pima-indians-diabetes.data.csv", header = FALSE)
 ```
 
-We define a function to train naive Byaes model by calculating p(y=class) and mean and standard deviation of feature variables for each class.
+We define a function to train naive Bayes model with Gaussian model and Bernoulli model (for later use) by calculating p(y=class), mean and standard deviation of feature variables for each class.
 
 ```{r}
 #Gaussian model
@@ -81,21 +81,21 @@ Since we use normal distribution for each feature $x_j$, the probability of $x_j
 $$
 p(x_j|y_k) = \frac{1}{{\sigma_k \sqrt {2\pi }}}e^-\frac{{\left({x - \mu_k} \right)^2}}{2\sigma_k^2}
 $$
-where $\mu_k$ and $\sigma_k$ are mean and stanstard deviation of feature $x_j$ for a given class $y_k$. They are calculated by function *gnb.fit*.
+where $\mu_k$ and $\sigma_k$ are mean and standard deviation of feature $x_j$ for a given class $y_k$. They are calculated by function *gnb.fit*.
 
-To calculate the log probablity of one class $y_k$, we use formula,
+To calculate the log probability of one class $y_k$, we use formula,
 $$
 \sum_jlog(x_j|y_k) + logp(y_k) 
 $$ 
 $$
 = -\sum_j(log\sigma_k + log\sqrt{2\pi} + \frac{\left(x - \mu_k\right)^2}{2\sigma_k^2}) + logp(y_k)
 $$
-Given $log\sqrt{2\pi}$ is contant, we have,
+Given $log\sqrt{2\pi}$ is constant, we have,
 $$
 \propto -\sum_j(log\sigma_k+ \frac{\left(x - \mu_k\right)^2}{2\sigma_k^2}) + logp(y_k)
 $$ 
 
-We define a function to predict the class given a model and features.
+We define functions to predict the class given a model and features.
 ```{r}
 gnb.predict = function(model, x) {
   class_num = length(model$p_y)
@@ -199,7 +199,7 @@ best_accuracy = sum(pred_y == test_y)/length(test_y)
 We got accuracy: $`r best_accuracy`$. The result don't have much difference compared with the previous one.
 
 ##Part C
-Use the caret and klaR packages to build a naive bayes classifier for this data, assuming that no attribute has a missing value. We will do 10-fold cross-validation and test the accuracy of the classifier on the held out 20%.
+Use the caret and klaR packages to build a naive Bayes classifier for this data, assuming that no attribute has a missing value. We will do 10-fold cross-validation and test the accuracy of the classifier on the held out 20%.
 
 ```{r, message=FALSE, warning=FALSE}
 library(caret)
@@ -279,26 +279,19 @@ sb_box = function(img, box_width, box_height) {
   ss_img[top:bottom, left:right] = (stretch_image(box_img, box_width, box_height))
   
   #Draw box
-  #ss_img[top, (left - 1) : (right + 1)]    = 255
-  #ss_img[bottom + 1, (left - 1) : (right + 1)] = 255
-  #ss_img[(top - 1): (bottom + 1), (left - 1)]    = 255
-  #ss_img[(top - 1): (bottom + 1), (right + 1)]   = 255
   ss_img[top, left:right]    = 255
   ss_img[bottom, left: right] = 255
   ss_img[top: bottom, left]    = 255
   ss_img[top: bottom, right]   = 255
   
-  #Thresholding
-  #ss_img[ss_img > 128] = 255
-  #ss_img[ss_img <= 128] = 0
-  
   return (ss_img)
 }
+
 ```
 
 To improve performance for repetitive experiment, we process the original images and save the stretched bounding box images to files. 
 
-```{r, eval=FALSE}
+```{r, eval = FALSE}
 process_save = function(input_gzfile_name, output_file_name) {
   input_gzfile = file(input_gzfile_name, "rb")
   output_file = file(output_file_name, "wb")
@@ -323,8 +316,8 @@ process_save = function(input_gzfile_name, output_file_name) {
   close(output_file)
 }
 
-process_save("./MNIST/train-images-idx3-ubyte", "./MNIST/train-images-idx3-ubyte-sb")
-process_save("./MNIST/t10k-images-idx3-ubyte", "./MNIST/t10k-images-idx3-ubyte-sb")
+process_save("./MNIST/train-images-idx3-ubyte", "./MNIST/train-images-idx3-ubyte-sbb")
+process_save("./MNIST/t10k-images-idx3-ubyte", "./MNIST/t10k-images-idx3-ubyte-sbb")
 ```
 
 Load data from saved file.
@@ -334,13 +327,11 @@ load_image_data = function(file_name){
   header = readBin(img_file, integer(), n = 4,  endian = "big")
   
   data = matrix(0, header[2], 28 * 28)
-  #data = list()
   for (i in 1:header[2]) {
     img = readBin(img_file, integer(), size = 1, n = 28*28, endian = "big", 
                    signed = FALSE)
     if(length(img) != 28*28) break
     data[i,] = img
-    #data[[i]] = img
   }
   close(img_file)
   
@@ -360,8 +351,10 @@ load_label_data = function(file_name){
 
   train_data = load_image_data("./MNIST/train-images-idx3-ubyte")
   test_data = load_image_data("./MNIST/t10k-images-idx3-ubyte")
-  sb_train_data = load_image_data("./MNIST/train-images-idx3-ubyte-sb")
-  sb_test_data = load_image_data("./MNIST/t10k-images-idx3-ubyte-sb")
+  
+  sbb_train_data = load_image_data("./MNIST/train-images-idx3-ubyte-sbb")
+  sbb_test_data = load_image_data("./MNIST/t10k-images-idx3-ubyte-sbb")
+
   train_label = load_label_data("./MNIST/train-labels-idx1-ubyte")
   test_label = load_label_data("./MNIST/t10k-labels-idx1-ubyte")
   
@@ -373,16 +366,17 @@ load_label_data = function(file_name){
   bin_test_data[bin_test_data <= 128] = 0
   bin_test_data[bin_test_data > 128] = 1
   
-  sb_bin_train_data = sb_train_data
-  sb_bin_test_data  = sb_test_data
-  sb_bin_train_data[sb_bin_train_data <= 128] = 0
-  sb_bin_train_data[sb_bin_train_data > 128] = 1
-  sb_bin_test_data[sb_bin_test_data <= 128] = 0
-  sb_bin_test_data[sb_bin_test_data > 128] = 1
+  sbb_bin_train_data = sbb_train_data
+  sbb_bin_test_data  = sbb_test_data
+  sbb_bin_train_data[sbb_bin_train_data <= 128] = 0
+  sbb_bin_train_data[sbb_bin_train_data > 128] = 1
+  sbb_bin_test_data[sbb_bin_test_data <= 128] = 0
+  sbb_bin_test_data[sbb_bin_test_data > 128] = 1
 ```
 
-Let's show some images for untouched, stredched bounding box and threshholed.
-```{r, echo=FALSE}
+```{r, eval=FALSE,echo=FALSE}
+#Show some images for untouched, stretched bounding box and thresholed.
+
 par(mfrow=c(6,5))
 par(mar = c(0,0,0,0))
 
@@ -394,12 +388,12 @@ for(i in index)
 
 for(i in index)
 {
-  image(matrix(sb_train_data[i,], 28, 28)[, 28:1], col  = gray((255:0)/255))
+  image(matrix(sbb_train_data[i,], 28, 28)[, 28:1], col  = gray((255:0)/255))
 }
 
 for(i in index)
 {
-  image(matrix(sb_bin_train_data[i,], 28, 28)[, 28:1], col  = gray((1:0)/1))
+  image(matrix(sbb_bin_train_data[i,], 28, 28)[, 28:1], col  = gray((1:0)/1))
 }
 ```
 
@@ -407,35 +401,46 @@ for(i in index)
 ##Part A
 Investigate classifying MNIST using naive Bayes. We use 20 x 20 for your bounding box dimensions.
 
-```{r}
-train_data = as.data.frame(train_data)
-bin_train_data = as.data.frame(bin_train_data)
-sb_train_data = as.data.frame(sb_train_data)
-sb_bin_train_data = as.data.frame(sb_bin_train_data)
+```{r eval=FALSE}
+train_df = as.data.frame(train_data)
+bin_train_df = as.data.frame(bin_train_data)
+sbb_train_df = as.data.frame(sbb_train_data)
+sbb_bin_train_df = as.data.frame(sbb_bin_train_data)
 
-best_model = cross_validation(train_data, train_label, 10)
+best_model = cross_validation(train_df, train_label, 10)
 pred_y = gnb.predict(best_model, test_data)
 gaussian_accuracy = sum(pred_y == test_label)/length(test_label)
 
-best_model = cross_validation(bin_train_data, train_label, 10)
+best_model = cross_validation(bin_train_df, train_label, 10)
 pred_y = gnb.predict(best_model, bin_test_data)
 bin_gaussian_accuracy = sum(pred_y == test_label)/length(test_label)
 
-best_model = cross_validation(sb_train_data, train_label, 10)
-pred_y = gnb.predict(best_model, sb_test_data)
-gaussian_sb_accuracy = sum(pred_y == test_label)/length(test_label)
+best_model = cross_validation(sbb_train_df, train_label, 10)
+pred_y = gnb.predict(best_model, sbb_test_data)
+gaussian_sbb_accuracy = sum(pred_y == test_label)/length(test_label)
 
-best_model = cross_validation(sb_bin_train_data, train_label, 10)
-pred_y = gnb.predict(best_model, sb_bin_test_data)
-bin_gaussian_sb_accuracy = sum(pred_y == test_label)/length(test_label)
+best_model = cross_validation(sbb_bin_train_df, train_label, 10)
+pred_y = gnb.predict(best_model, sbb_bin_test_data)
+bin_gaussian_sbb_accuracy = sum(pred_y == test_label)/length(test_label)
 
-best_model = cross_validation(bin_train_data, train_label, 10, model = "Bernoulli")
+best_model = cross_validation(bin_train_df, train_label, 10, model = "Bernoulli")
 pred_y = bnb.predict(best_model, bin_test_data)
 bernoulli_accuracy = sum(pred_y == test_label)/length(test_label)
 
-best_model = cross_validation(sb_bin_train_data, train_label, 10, model = "Bernoulli")
-pred_y = bnb.predict(best_model, sb_bin_test_data)
-bernoulli_sb_accuracy = sum(pred_y == test_label)/length(test_label)
+best_model = cross_validation(sbb_bin_train_df, train_label, 10, model = "Bernoulli")
+pred_y = bnb.predict(best_model, sbb_bin_test_data)
+bernoulli_sbb_accuracy = sum(pred_y == test_label)/length(test_label)
+```
+
+```{r, include=FALSE}
+#Use previous computed values
+gaussian_accuracy = 0.6771
+bin_gaussian_accuracy = 0.726
+gaussian_sbb_accuracy = 0.8266
+bin_gaussian_sbb_accuracy = 0.821
+bernoulli_accuracy = 0.7448
+bernoulli_sbb_accuracy = 0.4578
+
 ```
 
 The accuracy values for the six combinations of Gaussian (original and thresholding) v. Bernoulli distributions and untouched images v. stretched bounding boxes. 
@@ -443,16 +448,70 @@ The accuracy values for the six combinations of Gaussian (original and threshold
 |   Accuracy            | Gaussian                 |Gaussian (Thresholding)         | Bernoulli                 |
 |-----------------------|--------------------------|-----------------------------|---------------------------|
 |untouched images       | $`r gaussian_accuracy`$  | $`r bin_gaussian_accuracy`$| $`r bernoulli_accuracy`$ |
-|stretched bounding box | $`r gaussian_sb_accuracy`$| $`r bin_gaussian_sb_accuracy`$ | $`r bernoulli_sb_accuracy`$|
+|stretched bounding box | $`r gaussian_sbb_accuracy`$| $`r bin_gaussian_sbb_accuracy`$ | $`r bernoulli_sbb_accuracy`$|
 
 
-- From the results, we can see Bernoulli distribution is better for untouched pixels and Gaussian distribution is better for stretched bounding box images.
-- We also notice that Gaussian distribution used against (unthresholded) streched bounding box gives us the best result $`r gaussian_sb_accuracy`$.
+- From the results, we can see Bernoulli distribution is better for untouched pixels and Gaussian distribution is better for stretched bounding box images. The reason is Gaussian distribution model fit the stretched bounding box (image) better than untouched image. And Bernoulli distribution model fit the untouched image better than stretched bounding box (image).
+- We also notice that Gaussian distribution used against (unthresholded) stretched bounding box gives us the best result $`r gaussian_sbb_accuracy`$.
 
 ##Part B
-Investigate classifying MNIST using a decision forest. For this you should use a library. For your forest construction, try out and compare the combinations of parameters shown in the table (i.e. depth of tree, number of trees, etc.) by listing the accuracy for each of the following cases: untouched raw pixels; stretched bounding box. Please use 20 x 20 for your bounding box dimensions.
+Investigate classifying MNIST using a decision forest. For this we will use *h2o* library. For forest construction, will try out and compare the combinations of parameters shown in the table (i.e. depth of tree, number of trees, etc.) by listing the accuracy for each of the following cases: untouched raw pixels; stretched bounding box. 
 
-```{r}
+```{r, eval=FALSE, message=FALSE, warning=FALSE}
+library(h2o)
 
+calculate_accuracy = function(train_frame, test_frame, ntrees, max_depths) {
+  accuracies = matrix(0, length(ntrees),  length(max_depths))
+
+  for (ntree in 1:length(ntrees)) {
+    for (depth in 1:length(max_depths)) {
+      rf = h2o.randomForest(y = "label", training_frame = train_frame, ntrees = ntrees[ntree], 
+                            max_depth = max_depths[depth])
+      prediction = h2o.predict(rf, newdata = test_frame[-dim(test_frame)[2]])
+      
+      accuracies[ntree, depth] = sum(prediction[,1] == test_frame["label"]) / dim(test_frame)[1]
+    }
+  }
+  
+  return (accuracies)
+}
+
+h2o.init(nthreads=-1, max_mem_size = "2G")
+h2o.removeAll()
+
+h2o_train_data = as.h2o(data.frame(train_data, label=as.factor(train_label)))
+h2o_test_data = as.h2o(data.frame(test_data, label=as.factor(test_label)))
+h2o_sbb_train_data = as.h2o(data.frame(sbb_train_data, label=as.factor(train_label)))
+h2o_sbb_test_data = as.h2o(data.frame(sbb_test_data, label=as.factor(test_label)))
+
+accuracies = calculate_accuracy(h2o_train_data, h2o_test_data, c(10, 20, 30), c(4, 8, 16))
+sbb_accuracies = calculate_accuracy(h2o_sbb_train_data, h2o_sbb_test_data, c(10, 20, 30), c(4, 8, 16))
+
+h2o.shutdown(prompt=FALSE)
 ```
+
+```{r, include=FALSE}
+#Use previous computed values
+accuracies = matrix(c(0.8583,0.8668,0.8747,0.9292,0.9378,0.9402,0.9552,0.9616,0.9650), 3, 3)
+sbb_accuracies = matrix(c(0.8580,0.8653,0.8646,0.9454,0.9490,0.9508,0.9593,0.9672,0.9688), 3, 3)
+```
+
+
+|Untouched raw pixels| depth = 4             |depth = 8             | depth = 16             |
+|------------|----------------------|----------------------|------------------------|
+|#trees = 10 |$`r accuracies[1, 1]`$| $`r accuracies[1, 2]`$| $`r accuracies[1, 3]`$ |
+|#trees = 20 |$`r accuracies[2, 1]`$| $`r accuracies[2, 2]`$| $`r accuracies[2, 3]`$|
+|#trees = 30 |$`r accuracies[3, 1]`$| $`r accuracies[3, 2]`$| $`r accuracies[3, 3]`$|
+
+
+|Stretched bounding box| depth = 4             |depth = 8             | depth = 16             |
+|------------|--------------------------|--------------------------|------------------------|
+|#trees = 10 |$`r sbb_accuracies[1, 1]`$| $`r sbb_accuracies[1, 2]`$| $`r sbb_accuracies[1, 3]`$ |
+|#trees = 20 |$`r sbb_accuracies[2, 1]`$| $`r sbb_accuracies[2, 2]`$| $`r sbb_accuracies[2, 3]`$|
+|#trees = 30 |$`r sbb_accuracies[3, 1]`$| $`r sbb_accuracies[3, 2]`$| $`r sbb_accuracies[3, 3]`$|
+
+We notice that,
+
+- more and deeper trees give us better results.
+- untouched and stretched bounding box have similar results.
 
