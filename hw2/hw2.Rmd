@@ -19,54 +19,70 @@ Write a program to train a support vector machine on this data using stochastic 
 
 ```{r}
 library(readr)
-seed(19720816)
+set.seed(19720816)
 
 adult_data = read.csv("./data/adult.data", header = FALSE)[,c(1, 3, 5, 11, 12, 13, 15)]
-adult_feature = adult_data[, 1:6]
-adult_label = as.numeric(adult_data[, 7])
-adult_label[adult_label == 1] = -1
-adult_label[adult_label == 2] = 1
-
+adult_data[, 7] = as.numeric(adult_data[, 7])
+adult_data[adult_data[, 7] == 1, 7] = -1
+adult_data[adult_data[, 7] == 2, 7] = 1
 
 #Normalize the data
-for (i in 1:dim(adult_feature)[2]) {
-  s = sd(adult_feature[,i])
-  m = mean(adult_feature[,i])
+for (i in 1:6) {
+  s = sd(adult_data[,i])
+  m = mean(adult_data[,i])
   
-  adult_feature[,i] = (adult_feature[,i] - m) / s
+  adult_data[,i] = (adult_data[,i] - m) / s
 }
 
 #Calculate train/validation/test split
 total_count = dim(adult_data)[1]
 test_count = round(total_count * 0.1)
 valid_count = round(total_count * 0.1)
-train_count = total_count - test_count - valid_count
 
 test_indexes = sample(1:total_count,test_count)
-non_test_indexes = (1:total_count)[-test_indexes]
 ```
 
 $\lambda$
 
+$$
+\beta^TX + \beta_0
+$$
+
 ```{r}
+sgd = function(epoch, steps, sample_count, validation_count, data, test_data, beta, lambda) {
+  feature_count = dim(data)[2] - 1
+  accuracy = c()
+  w = c()
+  
+  for (epoch in 1:epoch) {
+    train_indexes = sample(1: dim(data)[1], dim(data)[1] - validation_count)
+    train_data  = data[train_indexes, ]
+    valid_data  = data[-train_indexes,]
+    steplength  = 1 / (0.01 * epoch + 50)
+    
+    for (step in 1:steps){
+      sample_indexes = sample(1:dim(train_data)[1], sample_count)
+      x = train_data[sample_indexes, 1:feature_count]
+      y = train_data[sample_indexes, feature_count + 1]
+      
+      y = y * (beta[2:(feature_count + 1)] %*% t(x) + beta[1])
+     
+      beta0_g = rep(0, length(y))
+      beta0_g[beta0_g < 1] = y[beta0_g < 1]
+      
+      beta[1] = beta[1] - steplength * sum(beta0_g)
+    }
+  }
+
+}
+
 max_epoch = 50
 max_step  = 300
 sample_count = 50
 
 lambdas =  c(1e-3, 1e-2, 1e-1, 1)
-alpha = runif(dime(adult_feature)[2])
-beta = runif(1)
+betas = runif(6)
 
-for (epoch in 1:max_epoch) {
-  train_indexes = sample(non_test_indexes, train_count)
-  train_feature = adult_feature[train_indexes,]
-  train_label   = adult_label[train_indexes]
-  test_data     = adult_feature[-train_indexes,]
-  test_label    = adult_label[-train_indexes]
-    
-  for (step in 1:max_step){
-    sample_indexes = sample(train_indexes, sample_count)
-  }
-}
+sgd(1, 300, 50, valid_count, adult_data[-test_indexes], adult_data[test_indexes], betas, lambdas[1])
 ```
 
