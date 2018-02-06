@@ -65,12 +65,16 @@ sgd = function(epoch, steps, sample_count, validation_count, data, test_data, be
       x = train_data[sample_indexes, 1:feature_count]
       y = train_data[sample_indexes, feature_count + 1]
       
-      y = y * (beta[2:(feature_count + 1)] %*% t(x) + beta[1])
+      h = y * (beta[1:feature_coun] %*% t(x) + beta[feature_count + 1])
      
-      beta0_g = rep(0, length(y))
+      beta_g = matrix(0, length(y), length(x))
+      beta_g[h >=1] = lambda * beta[1:feature_coun]
+      beta_g[h < 1] = lambda * beta[1:feature_coun] - y[h < 1] * x
+      beta[1:feature_count] = beta[1:feature_count]  - steplength * sum (beta_g)
+
+      beta0_g = y * 0
       beta0_g[beta0_g < 1] = y[beta0_g < 1]
-      
-      beta[1] = beta[1] - steplength * sum(beta0_g)
+      beta[feature_count + 1] = beta[feature_count + 1] - steplength * sum(beta0_g)
     }
   }
 
