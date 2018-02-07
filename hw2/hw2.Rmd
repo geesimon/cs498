@@ -42,17 +42,30 @@ valid_count = round(total_count * 0.1)
 test_indexes = sample(1:total_count,test_count)
 ```
 
-$\lambda$
+$$
+a^{(n+1)} = a^{n} - \frac{\eta}{N_b} (\sum_{i}^{N_b} \left\{\begin{matrix}
+0&y_i(a^Tx_i + b)\geq 1 
+\\-y_ix_i&otherwise
+\end{matrix}\right. - \lambda a)
+$$
+$$
+b^{(n+1)} = b^{n} - \frac{\eta}{N_b} \sum_{i}^{N_b} \left\{\begin{matrix}
+0&y_i(a^Tx_i + b)\geq 1 
+\\-y_i&otherwise
+\end{matrix}\right.
+$$
 
 $$
 \beta^TX + \beta_0
 $$
 
 ```{r}
-sgd = function(epoch, steps, sample_count, validation_count, data, test_data, beta, lambda) {
+sgd = function(epoch, steps, sample_count, validation_count, data, test_data, parameters, lambda) {
   feature_count = dim(data)[2] - 1
   accuracy = c()
   w = c()
+  v_a = parameters[1:feature_count]
+  b = parameters[feature_count + 1]
   
   for (epoch in 1:epoch) {
     train_indexes = sample(1: dim(data)[1], dim(data)[1] - validation_count)
@@ -65,28 +78,20 @@ sgd = function(epoch, steps, sample_count, validation_count, data, test_data, be
       x = train_data[sample_indexes, 1:feature_count]
       y = train_data[sample_indexes, feature_count + 1]
       
-      h = y * (beta[1:feature_coun] %*% t(x) + beta[feature_count + 1])
-     
-      beta_g = matrix(0, length(y), length(x))
-      beta_g[h >=1] = lambda * beta[1:feature_coun]
-      beta_g[h < 1] = lambda * beta[1:feature_coun] - y[h < 1] * x
-      beta[1:feature_count] = beta[1:feature_count]  - steplength * sum (beta_g)
-
-      beta0_g = y * 0
-      beta0_g[beta0_g < 1] = y[beta0_g < 1]
-      beta[feature_count + 1] = beta[feature_count + 1] - steplength * sum(beta0_g)
+      h = y * (v_a %*% t(x) + b)
+      
+      #update a and b
+      v_a = v_a - steplength/sample_count * (colSums(-y[h < 1] * x) + lambda * v_a)
+      b   = b - steplength/sample_count * sum(-y[h < 1])
     }
+    print(t(v_a) %*% v_a)
   }
-
+  return (v_a)
 }
 
-max_epoch = 50
-max_step  = 300
-sample_count = 50
-
 lambdas =  c(1e-3, 1e-2, 1e-1, 1)
-betas = runif(6)
+params = runif(7)
 
-sgd(1, 300, 50, valid_count, adult_data[-test_indexes], adult_data[test_indexes], betas, lambdas[1])
+sgd(50, 300, 50, valid_count, adult_data[-test_indexes,], adult_data[test_indexes,], params, lambdas[1])
 ```
 
