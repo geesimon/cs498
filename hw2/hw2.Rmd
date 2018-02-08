@@ -44,13 +44,13 @@ test_indexes = sample(1:total_count,test_count)
 
 $$
 a^{(n+1)} = a^{n} - \frac{\eta}{N_b} (\sum_{i}^{N_b} \left\{\begin{matrix}
-0&y_i(a^Tx_i + b)\geq 1 
+0&\text{if }y_i(a^Tx_i + b)\geq 1 
 \\-y_ix_i&otherwise
-\end{matrix}\right. - \lambda a)
+\end{matrix}\right. + \lambda a)
 $$
 $$
 b^{(n+1)} = b^{n} - \frac{\eta}{N_b} \sum_{i}^{N_b} \left\{\begin{matrix}
-0&y_i(a^Tx_i + b)\geq 1 
+0&\text{if }y_i(a^Tx_i + b)\geq 1 
 \\-y_i&otherwise
 \end{matrix}\right.
 $$
@@ -60,20 +60,37 @@ $$
 $$
 
 ```{r}
-sgd = function(epoch, steps, sample_count, validation_count, data, test_data, parameters, lambda) {
+predict = function(a, b, features) {
+  pred_y = a %*% t(features) + b
+  pred_y[pred_y <= 0] = -1
+  pred_y[pred_y > 0] = 1
+  
+  return (pred_y)
+}
+
+sgd = function(epoch, n_steps, sample_count, valid_count, heldout_count, steps_before_testing, data, test_data, parameters, lambda) {
   feature_count = dim(data)[2] - 1
   accuracy = c()
   w = c()
   v_a = parameters[1:feature_count]
   b = parameters[feature_count + 1]
+  heldout_accuracies = rep(0, epoch * n_steps / steps_before_testing)
+  
+  total_step = 1
+  test_count = 1
   
   for (epoch in 1:epoch) {
-    train_indexes = sample(1: dim(data)[1], dim(data)[1] - validation_count)
-    train_data  = data[train_indexes, ]
-    valid_data  = data[-train_indexes,]
+    #split heldout_data
+    heldout_indexes = sample(1: dim(data)[1], heldout_count)
+    heldout_data = data[heldout_indexes,]
+    #make the remaining the test and validation data
+    r_indexes     = (1: dim(data)[1])[-heldout_indexes]
+    train_indexes = sample(1:length(r_indexes), length(r_indexes) - valid_count)
+    train_data  = data[r_indexes[train_indexes], ]
+    valid_data  = data[r_indexes[-train_indexes],]
     steplength  = 1 / (0.01 * epoch + 50)
     
-    for (step in 1:steps){
+    for (step in 1:n_steps){
       sample_indexes = sample(1:dim(train_data)[1], sample_count)
       x = train_data[sample_indexes, 1:feature_count]
       y = train_data[sample_indexes, feature_count + 1]
@@ -81,17 +98,24 @@ sgd = function(epoch, steps, sample_count, validation_count, data, test_data, pa
       h = y * (v_a %*% t(x) + b)
       
       #update a and b
-      v_a = v_a - steplength/sample_count * (colSums(-y[h < 1] * x) + lambda * v_a)
+      v_a = v_a - steplength/sample_count * (colSums(-y[h < 1] * x[h < 1,]) + lambda * v_a)
       b   = b - steplength/sample_count * sum(-y[h < 1])
+      
+      if(total_step %% steps_before_testing == 0){
+        pred_y = predict(v_a, b, heldout_data[1:feature_count])
+        heldout_accuracies[test_count] = sum(pred_y == heldout_data) / heldout_count
+        test_count = test_count + 1
+      } 
+      total_step = total_step + 1
     }
-    print(t(v_a) %*% v_a)
+    #print(t(v_a) %*% v_a)
   }
-  return (v_a)
+  return (list(accuracy=heldout_accuracies))
 }
 
 lambdas =  c(1e-3, 1e-2, 1e-1, 1)
 params = runif(7)
 
-sgd(50, 300, 50, valid_count, adult_data[-test_indexes,], adult_data[test_indexes,], params, lambdas[1])
+sgd(50, 300, 1, valid_count, 50, 30, adult_data[-test_indexes,], adult_data[test_indexes,], params, lambdas[1])
 ```
 
