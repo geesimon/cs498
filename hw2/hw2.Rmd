@@ -57,7 +57,7 @@ valid_count = round(total_count * 0.1)
 test_indexes = sample(1:total_count,test_count)
 ```
 
-We will write a function to do Stochastic Gradient Descent, by using the following fomular. Its extension to text book's example and add support to multiple sample $N_b$.
+We will write a function to do Stochastic Gradient Descent, by using the following formula. Its extension to text book's example and add support to multiple sample $N_b$.
 $$
 a^{(n+1)} = a^{n} - \frac{\eta}{N_b} (\sum_{i}^{N_b} \left\{\begin{matrix}
 0&\text{if }y_i(a^Tx_i + b)\geq 1 
@@ -157,7 +157,7 @@ sgd = function(epoch, n_steps, sample_count, valid_count, heldout_count, steps_b
 ```
 
 ## A plot of the accuracy every 30 steps, for each value of the regularization constant
-Note: we take 50 samples ($N_b = 30$) in order to make a good data coverage. Experiements also show lower the sample won't make much difference.
+Note: we take 50 samples ($N_b = 30$) in order to make a good data coverage. Experiments also show lower the sample won't make much difference.
 
 ```{r}
 lambdas =  c(10, 1, 1e-1, 1e-2, 1e-3, 1e-5)
@@ -192,7 +192,7 @@ legend("top", title = expression(lambda), legend = lambdas, lwd = 1, col = color
 
 ## Estimate of the best value of the regularization constant (together with a brief description of why you believe that is a good value)
 
-Let's make a boxplot of valication accuracy for each $\lambda$
+Let's make a boxplot of validation accuracy for each $\lambda$
 ```{r}
 df = data.frame()
 for (i in 1:length(lambdas)){
