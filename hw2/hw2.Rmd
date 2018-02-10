@@ -119,7 +119,7 @@ sgd = function(epoch, n_steps, sample_count, valid_count, heldout_count, steps_b
       if(total_step %% steps_before_testing == 0){
         pred_y = predict(v_a, b, heldout_data[, 1:feature_count])
         heldout_accuracies[test_count] = sum(pred_y == heldout_data[, feature_count + 1]) / heldout_count
-        coef_magnitude[test_count] = sqrt(t(v_a) %*% v_a + b ^ 2)
+        coef_magnitude[test_count] = sqrt(t(v_a) %*% v_a)
         test_count = test_count + 1
       } 
       total_step = total_step + 1
@@ -134,7 +134,7 @@ sgd = function(epoch, n_steps, sample_count, valid_count, heldout_count, steps_b
                valid_accuracies = valid_accuracies))
 }
 
-lambdas =  c(1e-3, 1e-2, 1e-1, 1)
+lambdas =  c(10, 1, 1e-1, 1e-2, 1e-3, 1e-5)
 params = runif(7, 0, 10)
 results = list()
 
@@ -145,6 +145,30 @@ for (i in 1:length(lambdas)){
 
 Draw diagram
 ```{r}
+colors = c("purple", "cyan", "dodgerblue", "darkgreen", "darkred", "darkorange4")
 
+plot(1:500, results[[1]]$heldout_accuracies, type = "l", ylim=c(0,1), xlab="Test Count", ylab="Heldout Accuracy", col=colors[1])
+
+for (i in 2:length(lambdas)) {
+  lines(1:500, results[[i]]$heldout_accuracies, col=colors[i])
+}
+
+legend("bottomright", title = expression(lambda), legend = lambdas, lwd = 1, col = colors)
+
+plot(1:500, results[[1]]$coef_magnitude, type = "l", xlab="Test Count", ylab="Magnitude of the coefficient vector", col=colors[1])
+
+for (i in 2:length(lambdas)) {
+  lines(1:500, results[[i]]$coef_magnitude, col=colors[i])
+}
+
+legend("topright", title = expression(lambda), legend = lambdas, lwd = 1, col = colors)
+```
+```{r}
+df = data.frame()
+for (i in 1:length(lambdas)){
+  df = rbind(df, data.frame(y = results[[i]]$valid_accuracies, lambda=lambdas[i]))
+}
+
+boxplot(y ~ lambda, data = df, xlab=expression(lambda), ylab="Validation Accuracy", pch = 20, cex = 2, col = "darkorange", border = "dodgerblue")
 ```
 
