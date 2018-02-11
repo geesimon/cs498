@@ -3,9 +3,9 @@ title: "Homework 2"
 author: "CS 498, Spring 2018, Xiaoming Ji"
 date: ''
 output:
-  pdf_document: default
   html_document:
     toc: yes
+  pdf_document: default
 ---
 
 The UC Irvine machine learning data repository hosts a collection of data on adult income, donated by Ronny Kohavi and Barry Becker. You can find this data at https://archive.ics.uci.edu/ml/datasets/Adult For each record, there is a set of continuous attributes, and a class "less than 50K" or "greater than 50K". There are 48842 examples. You should use only the continuous attributes (see the description on the web page) and drop examples where there are missing values of the continuous attributes. Separate the resulting dataset randomly into 10% validation, 10% test, and 80% training examples.
@@ -202,7 +202,7 @@ for (i in 1:length(lambdas)){
 boxplot(y ~ lambda, data = df, xlab=expression(lambda), ylab="Validation Accuracy", pch = 20, cex = 2, col = "darkorange", border = "dodgerblue")
 ```
 
-By checking this plot, $\lambda = 0.1$ has the best mean of validation accuracy and relatively smallest magnitude of the coefficient vector (small coefficient means small hinge loss for unseen data). Thus, we choose *0.1* as our best $\lambda$.
+By checking this plot, $\lambda = 0.1$ has the best mean of validation accuracy and relatively small magnitude of the coefficient vector (small coefficient means small hinge loss for unseen data). Thus, we choose *0.1* as our best $\lambda$.
 
 ## Estimate of the accuracy of the best classifier on the 10% test dataset data
 
