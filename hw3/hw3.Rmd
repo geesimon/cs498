@@ -10,9 +10,137 @@ output:
 
 CIFAR-10 is a dataset of 32x32 images in 10 categories, collected by Alex Krizhevsky, Vinod Nair, and Geoffrey Hinton. It is often used to evaluate machine learning algorithms. You can download this dataset from https:// www.cs.toronto.edu/~kriz/cifar.html.
 
+Firstly, we do some pre-processing on the data.
+```{r}
+# Read binary file and convert to integer vectors
+# File format is 10000 records following the pattern:
+label_names = read.table("cifar-10-batches-bin/batches.meta.txt")
+label_count = dim(label_names)[1]
+image_bytes = 32 * 32 * 3
+```
+
+```{r eval=FALSE}
+#Set filenames need to be read
+folder_name = "cifar-10-batches-bin"
+file_names = c("data_batch_1.bin", "data_batch_2.bin","data_batch_3.bin",
+               "data_batch_4.bin","data_batch_5.bin","test_batch.bin")
+num.images = 10000 # Set to 10000 to retrieve all images per file to memory
+mat_images = matrix(0, nrow = num.images * length(file_names), ncol = 1024 * 3 + 1)
+ 
+# Cycle through all binary files
+index = 1
+for (f in 1:length(file_names)) {
+  print(paste("Reading ", file_names[f], sep=""))
+  to.read = file(paste(folder_name, "/", file_names[f], sep=""), "rb")
+  for(i in 1:num.images) {
+    l = readBin(to.read, integer(), size=1, n=1, endian="big")
+    mat_images[index, 1: image_bytes] = as.integer(readBin(to.read, raw(), size=1, 
+                                                        n=image_bytes, endian="big"))
+    mat_images[index, image_bytes + 1] = l + 1
+    #df_images = rbind(df_images, mat_images[index,])
+    index = index + 1
+  }
+  close(to.read)
+}
+
+df_images = as.data.frame(mat_images)
+save(df_images,file="saved/images.df")
+```
+
+```{r}
+# function to run sanity check on photos & labels import
+drawImage = function(image, title) {
+  r = image[1:1024]
+  g = image[1025:2048]
+  b = image[2049:3072]
+  img_matrix = rgb(r, g, b, maxColorValue=255)
+
+  image(matrix(1:(32*32), 32, 32)[, 32:1], col=img_matrix, axes = FALSE, 
+        main = title)
+}
+```
+
 # 1.1
 For each category, compute the mean image and the first 20 principal components. Plot the error resulting from representing the images of each category using the first 20 principal components against the category.
 
+```{r}
+load("saved/images.df") #Load file from
+```
+
+```{r}
+eigen_pca = function (data) {
+  mean = colSums(data)
+  covmat = cov(data)
+  eigen = eigen(covmat)
+  
+  return (list(mean = colMeans(data), pc = eigen$vectors, weight = eigen$values))
+}
+
+#Constructing a low-dimensional representation:
+cld = function(p, x, k) {
+  u = p$pc[, 1:k]
+  x = u %*% crossprod(u, x - p$mean) + p$mean
+  x[x > 255] = 255
+  x[x < 0] = 0
+  
+  return (x)
+}
+```
+
+```{r, eval=FALSE}
+timestamp()
+all_pca = list()
+for (i in 1:label_count) {
+  all_pca[[i]] = eigen_pca(df_images[df_images$V3073 == i, -3073])
+}
+timestamp()
+save(all_pca, file="saved/pca.data")
+```
+```{r}
+load("saved/pca.data")
+```
+
+```{r}
+pc_count = 20
+
+colors = c("darkblue", "darkcyan", "darkgreen", "darkgrey", "darkorange", "darkorchid", "darkred", "darksalmon", "darkseagreen", "darkturquoise")
+line_types = c(1, 1, 1, 2, 2, 3, 3, 4, 4, 5)
+
+error = list()
+e = rep(0, pc_count)
+max_error = 0
+min_error = 1e+10
+for (i in 1:label_count){
+  for (j in 1:pc_count) {
+    e[j] = sum(all_pca[[i]]$weight[j:image_bytes])
+  }
+  if(max(e) > max_error) max_error = max(e)
+  if(min(e) < min_error) min_error = min(e)
+  error[[i]] = e
+}
+
+plot(error[[1]], type = "l", xlab="Principal Components Count", ylab="Error",
+     ylim = c(min_error, max_error), col=colors[1], lty = line_types[1])
+
+for (i in 2:label_count){
+  lines(error[[i]], col=colors[i], lty = line_types[i])
+}
+
+legend("topright", legend = label_names[,1], lwd = 1, col = colors, lty=line_types)
+```
+
+```{r}
+sample_index = 3000
+sample_label = df_images[sample_index, 3073]
+par(mfrow=c(2,5))
+par(mar = c(1,1,1,1))
+
+drawImage(df_images[sample_index, -3073], "Original")
+drawImage(all_pca[[sample_label]]$mean, "Mean")
+for (k in c(1, 5, 10, 15, 20, 100, 150, 200)){
+  drawImage(cld(all_pca[[sample_label]], t(df_images[sample_index, -3073]), k), k)
+}
+```
 
 
 # 1.2
