@@ -55,7 +55,7 @@ drawImage = function(image, title) {
   b = image[2049:3072]
   img_matrix = rgb(r, g, b, maxColorValue=255)
 
-  image(matrix(1:(32*32), 32, 32)[, 32:1], col=img_matrix, axes = FALSE, 
+  image(matrix(1:(32*32), 32, 32)[, 32:1], col=img_matrix, axes = FALSE,
         main = title)
 }
 ```

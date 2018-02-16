@@ -160,7 +160,7 @@ for (f in 1:length(file_names)) {
 }
 
 df_images = as.data.frame(mat_images)
-save(df_images,file=&quot;images.df&quot;)</code></pre>
+save(df_images,file=&quot;saved/images.df&quot;)</code></pre>
 <pre class="r"><code># function to run sanity check on photos &amp; labels import
 drawImage = function(image, title) {
   r = image[1:1024]
@@ -168,13 +168,13 @@ drawImage = function(image, title) {
   b = image[2049:3072]
   img_matrix = rgb(r, g, b, maxColorValue=255)
 
-  image(matrix(1:(32*32), 32, 32)[, 32:1], col=img_matrix, axes = FALSE, 
+  image(matrix(1:(32*32), 32, 32)[, 32:1], col=img_matrix, axes = FALSE,
         main = title)
 }</code></pre>
 <div id="section" class="section level1">
 <h1>1.1</h1>
 <p>For each category, compute the mean image and the first 20 principal components. Plot the error resulting from representing the images of each category using the first 20 principal components against the category.</p>
-<pre class="r"><code>load(&quot;images.df&quot;) #Load file from</code></pre>
+<pre class="r"><code>load(&quot;saved/images.df&quot;) #Load file from</code></pre>
 <pre class="r"><code>eigen_pca = function (data) {
   mean = colSums(data)
   covmat = cov(data)
@@ -198,8 +198,8 @@ for (i in 1:label_count) {
   all_pca[[i]] = eigen_pca(df_images[df_images$V3073 == i, -3073])
 }
 timestamp()
-save(all_pca, file=&quot;pca.data&quot;)</code></pre>
-<pre class="r"><code>load(&quot;pca.data&quot;)</code></pre>
+save(all_pca, file=&quot;saved/pca.data&quot;)</code></pre>
+<pre class="r"><code>load(&quot;saved/pca.data&quot;)</code></pre>
 <pre class="r"><code>pc_count = 20
 
 colors = c(&quot;darkblue&quot;, &quot;darkcyan&quot;, &quot;darkgreen&quot;, &quot;darkgrey&quot;, &quot;darkorange&quot;, &quot;darkorchid&quot;, &quot;darkred&quot;, &quot;darksalmon&quot;, &quot;darkseagreen&quot;, &quot;darkturquoise&quot;)
