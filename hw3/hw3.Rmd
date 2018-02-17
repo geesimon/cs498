@@ -13,7 +13,7 @@ CIFAR-10 is a dataset of 32x32 images in 10 categories, collected by Alex Krizhe
 Firstly, we do some pre-processing on the data.
 ```{r}
 #Define whether we should load results from prevously saved file in order to speed up the execution
-SKIP_EXPENSIVE_COMPUTING = TRUE
+SKIP_EXPENSIVE_COMPUTING = FALSE
 
 # Read binary file and convert to integer vectors
 # File format is 10000 records following the pattern:
@@ -215,11 +215,24 @@ for (i in 1: (label_count - 1)) {
     D[j, i] = D[i, j]
   }
 }
-
+#print(D)
 A = diag(1, label_count, label_count) - matrix(1, label_count, label_count) / label_count
 W = - 1/2 * A %*% D %*% t(A)
 e = eigen(W)
-Lambda = 
+V = e$vectors[,1:2] %*% diag(sqrt(e$values[1:2]))
+
+#Offset the results so that category 1 is at the origin
+V1 = t(t(V) - V[1,])
+#rotate and scale the results so that category 2 is at (1,0);
+theta = -asin(V1[2,1]/sqrt(V1[2,1]^2 + V1[2,2]^2)) + pi/2
+r  = matrix(c(cos(theta),sin(theta),-sin(theta),cos(theta)), 2, 2)  #rotation matrix
+V2 = V1 %*% r
+V3 = V2 / V2[2,1]
+
+plot(V3, xlab = "", ylab = "", col="Red", pch = 8, cex = 2, xlim = c(-0.1, 1.1))
+for(i in 1:label_count){
+  text(V3[i,1], V3[i,2], label_names[i,1], offset = 0)
+}
 ```
 
 
