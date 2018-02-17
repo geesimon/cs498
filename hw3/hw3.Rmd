@@ -12,6 +12,9 @@ CIFAR-10 is a dataset of 32x32 images in 10 categories, collected by Alex Krizhe
 
 Firstly, we do some pre-processing on the data.
 ```{r}
+#Define whether we should load results from prevously saved file in order to speed up the execution
+SKIP_EXPENSIVE_COMPUTING = TRUE
+
 # Read binary file and convert to integer vectors
 # File format is 10000 records following the pattern:
 label_names = read.table("cifar-10-batches-bin/batches.meta.txt")
@@ -19,7 +22,7 @@ label_count = dim(label_names)[1]
 image_bytes = 32 * 32 * 3
 ```
 
-```{r eval=FALSE}
+```{r eval=!SKIP_EXPENSIVE_COMPUTING}
 #Set filenames need to be read
 folder_name = "cifar-10-batches-bin"
 file_names = c("data_batch_1.bin", "data_batch_2.bin","data_batch_3.bin",
@@ -50,6 +53,8 @@ save(df_images,file="saved/images.df")
 ```{r}
 # function to run sanity check on photos & labels import
 drawImage = function(image, title) {
+  image[image > 255] = 255
+  image[image < 0] = 0
   r = image[1:1024]
   g = image[1025:2048]
   b = image[2049:3072]
@@ -63,15 +68,19 @@ drawImage = function(image, title) {
 # 1.1
 For each category, compute the mean image and the first 20 principal components. Plot the error resulting from representing the images of each category using the first 20 principal components against the category.
 
-```{r}
-load("saved/images.df") #Load file from
+```{r eval=SKIP_EXPENSIVE_COMPUTING}
+load("saved/images.df") #Load images
 ```
 
+$$
+\sum_{j>s}{j=d}
+$$
 ```{r}
+#Do PCA using Eigen value and vector
 eigen_pca = function (data) {
   mean = colSums(data)
   covmat = cov(data)
-  eigen = eigen(covmat)
+  eigen = eigen(covmat, symmetric = TRUE)
   
   return (list(mean = colMeans(data), pc = eigen$vectors, weight = eigen$values))
 }
@@ -80,53 +89,24 @@ eigen_pca = function (data) {
 cld = function(p, x, k) {
   u = p$pc[, 1:k]
   x = u %*% crossprod(u, x - p$mean) + p$mean
-  x[x > 255] = 255
-  x[x < 0] = 0
   
   return (x)
 }
 ```
 
-```{r, eval=FALSE}
-timestamp()
+Let's do PCA for each category.
+```{r, eval=!SKIP_EXPENSIVE_COMPUTING}
+t_start = Sys.time()
 all_pca = list()
 for (i in 1:label_count) {
   all_pca[[i]] = eigen_pca(df_images[df_images$V3073 == i, -3073])
 }
-timestamp()
+difftime(Sys.time(), t_start)
 save(all_pca, file="saved/pca.data")
 ```
-```{r}
+To illustrate how well low-dimensional representation works, we approximate a sample image by the mean and some principal components. Notice how good the approximation becomes with relatively few components (100 vs. 3072).
+```{r eval=SKIP_EXPENSIVE_COMPUTING}
 load("saved/pca.data")
-```
-
-```{r}
-pc_count = 20
-
-colors = c("darkblue", "darkcyan", "darkgreen", "darkgrey", "darkorange", "darkorchid", "darkred", "darksalmon", "darkseagreen", "darkturquoise")
-line_types = c(1, 1, 1, 2, 2, 3, 3, 4, 4, 5)
-
-error = list()
-e = rep(0, pc_count)
-max_error = 0
-min_error = 1e+10
-for (i in 1:label_count){
-  for (j in 1:pc_count) {
-    e[j] = sum(all_pca[[i]]$weight[j:image_bytes])
-  }
-  if(max(e) > max_error) max_error = max(e)
-  if(min(e) < min_error) min_error = min(e)
-  error[[i]] = e
-}
-
-plot(error[[1]], type = "l", xlab="Principal Components Count", ylab="Error",
-     ylim = c(min_error, max_error), col=colors[1], lty = line_types[1])
-
-for (i in 2:label_count){
-  lines(error[[i]], col=colors[i], lty = line_types[i])
-}
-
-legend("topright", legend = label_names[,1], lwd = 1, col = colors, lty=line_types)
 ```
 
 ```{r}
@@ -142,9 +122,106 @@ for (k in c(1, 5, 10, 15, 20, 100, 150, 200)){
 }
 ```
 
+Now, let's calculate and plot the error. We know that the error is the sum of the diagonal elements of the covariance matrix as:
+
+$$
+\sum_{j>s}^{j=d}var\left ( \left \{ r^{(j)} \right \} \right )
+$$
+
+```{r}
+pc_count = 20
+
+colors = c("darkblue", "darkcyan", "darkgreen", "darkgrey", "darkorange", "darkorchid", "darkred", "darksalmon", "darkseagreen", "darkturquoise")
+line_types = c(1, 1, 1, 2, 2, 3, 3, 4, 4, 5)
+
+var_error = list()
+e = rep(0, pc_count)
+max_error = 0
+min_error = 1e+10
+for (i in 1:label_count){
+  for (j in 1:pc_count) {
+    e[j] = sum(all_pca[[i]]$weight[(j + 1):image_bytes])
+  }
+  if(max(e) > max_error) max_error = max(e)
+  if(min(e) < min_error) min_error = min(e)
+  var_error[[i]] = e
+}
+
+plot(var_error[[1]], type = "l", xlab="Principal Components Count", ylab="Error (by Eigen Value)",
+     ylim = c(min_error, max_error), col=colors[1], lty = line_types[1])
+
+for (i in 2:label_count){
+  lines(var_error[[i]], col=colors[i], lty = line_types[i])
+}
+
+legend("topright", legend = label_names[,1], lwd = 1, col = colors, lty=line_types)
+```
+
+Alternatively, we can also compute the error by making low-dimensional representation for all of the images in a given category. Then, for each image, find the per-pixel differences between the reconstruction and its original image. Square those differences individually and sum them over the whole image. Finally, calculate the mean of this value over the whole category.
+
+```{r eval=!SKIP_EXPENSIVE_COMPUTING}
+t_start = Sys.time()
+
+image_error = list()
+e = rep(0, pc_count)
+max_error = 0
+min_error = 1e+10
+for (i in 1:label_count){
+  images = df_images[df_images$V3073 == i,]
+  for (k in 1:pc_count){
+    diff = apply(images, 1, function(x){
+      return (x[-3073] - cld(all_pca[[x[3073]]], x[-3073], k))}
+    )
+    e[k] = mean(apply(diff, 2, function(v){return (crossprod(v, v))}))
+  }
+  if(max(e) > max_error) max_error = max(e)
+  if(min(e) < min_error) min_error = min(e)
+  image_error[[i]] = e
+}
+
+difftime(Sys.time(), t_start)
+
+save(image_error, file="saved/image_error.data")
+```
+
+```{r eval=SKIP_EXPENSIVE_COMPUTING}
+load("saved/image_error.data")
+```
+
+```{r}
+plot(image_error[[1]], type = "l", xlab="Principal Components Count", ylab="Error (by Low-Dimensional Image Comparison)", ylim = c(min_error, max_error), col=colors[1], lty = line_types[1])
+
+for (i in 2:label_count){
+  lines(image_error[[i]], col=colors[i], lty = line_types[i])
+}
+
+legend("topright", legend = label_names[,1], lwd = 1, col = colors, lty=line_types)
+```
+
+We can check and conclude the results are almost identical between 2 approaches. 
 
 # 1.2
 Compute the distances between mean images for each pair of classes. Use principal coordinate analysis to make a 2D map of the means of each categories. For this exercise, compute distances by thinking of the images as vectors.
+
+We follow *Procedure 4.3* on textbook page 82 to calculate 2D coordinates.
+```{r}
+#Calculate distance of mean images
+D = matrix(0, nrow = label_count, ncol = label_count)
+
+for (i in 1: (label_count - 1)) {
+  for (j in (i + 1) : label_count){
+    diff = (all_pca[[i]]$mean - all_pca[[j]]$mean)
+    D[i, j] = sqrt(crossprod(diff, diff))
+    D[j, i] = D[i, j]
+  }
+}
+
+A = diag(1, label_count, label_count) - matrix(1, label_count, label_count) / label_count
+W = - 1/2 * A %*% D %*% t(A)
+e = eigen(W)
+Lambda = 
+```
+
 
 # 1.3
 Here is another measure of the similarity of two classes. For class A and class B, define E(A | B) to be the average error obtained by representing all the images of class A using the mean of class A and the first 20 principal components of class B. Now define the similarity between classes to be (1/2)(E(A | B) + E(B | A)). If A and B are very similar, then this error should be small, because A's principal components should be good at representing B. But if they are very different, then A's principal components should represent B poorly. In turn, the similarity measure should be big. Use principal coordinate analysis to make a 2D map of the classes. Compare this map to the map in the previous exercise? are they different? why?
