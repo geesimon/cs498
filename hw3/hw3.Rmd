@@ -6,23 +6,23 @@ output:
   html_document:
     toc: yes
   pdf_document: default
+params:
+  load_precomputed_data: TRUE
 ---
 
 CIFAR-10 is a dataset of 32x32 images in 10 categories, collected by Alex Krizhevsky, Vinod Nair, and Geoffrey Hinton. It is often used to evaluate machine learning algorithms. You can download this dataset from https:// www.cs.toronto.edu/~kriz/cifar.html.
 
 Firstly, we do some pre-processing on the data.
 ```{r}
-#Define whether we should load results from prevously saved file in order to speed up the execution
-SKIP_EXPENSIVE_COMPUTING = FALSE
-
 # Read binary file and convert to integer vectors
 # File format is 10000 records following the pattern:
 label_names = read.table("cifar-10-batches-bin/batches.meta.txt")
 label_count = dim(label_names)[1]
 image_bytes = 32 * 32 * 3
+pc_count = 20
 ```
 
-```{r eval=!SKIP_EXPENSIVE_COMPUTING}
+```{r, eval=!params$load_precomputed_data}
 #Set filenames need to be read
 folder_name = "cifar-10-batches-bin"
 file_names = c("data_batch_1.bin", "data_batch_2.bin","data_batch_3.bin",
@@ -68,7 +68,7 @@ drawImage = function(image, title) {
 # 1.1
 For each category, compute the mean image and the first 20 principal components. Plot the error resulting from representing the images of each category using the first 20 principal components against the category.
 
-```{r eval=SKIP_EXPENSIVE_COMPUTING}
+```{r eval=load_precomputed_data}
 load("saved/images.df") #Load images
 ```
 
@@ -86,26 +86,29 @@ eigen_pca = function (data) {
 }
 
 #Constructing a low-dimensional representation:
-cld = function(p, x, k) {
-  u = p$pc[, 1:k]
-  x = u %*% crossprod(u, x - p$mean) + p$mean
+cld = function(pc, mean, x, k) {
+  u = pc[, 1:k]
+  x = u %*% crossprod(u, x - mean) + mean
   
   return (x)
 }
 ```
 
 Let's do PCA for each category.
-```{r, eval=!SKIP_EXPENSIVE_COMPUTING}
+```{r, eval=!params$load_precomputed_data}
 t_start = Sys.time()
 all_pca = list()
+pb = txtProgressBar(min = 0, max = label_count, style = 3)
+
 for (i in 1:label_count) {
   all_pca[[i]] = eigen_pca(df_images[df_images$V3073 == i, -3073])
+  setTxtProgressBar(pb, i)
 }
 difftime(Sys.time(), t_start)
 save(all_pca, file="saved/pca.data")
 ```
-To illustrate how well low-dimensional representation works, we approximate a sample image by the mean and some principal components. Notice how good the approximation becomes with relatively few components (100 vs. 3072).
-```{r eval=SKIP_EXPENSIVE_COMPUTING}
+To illustrate how well low-dimensional representation works, we approximate a sample image (Dear) by the mean and some principal components. Notice how good the approximation becomes with relatively few components (100 vs. 3072).
+```{r eval=load_precomputed_data}
 load("saved/pca.data")
 ```
 
@@ -118,7 +121,8 @@ par(mar = c(1,1,1,1))
 drawImage(df_images[sample_index, -3073], "Original")
 drawImage(all_pca[[sample_label]]$mean, "Mean")
 for (k in c(1, 5, 10, 15, 20, 100, 150, 200)){
-  drawImage(cld(all_pca[[sample_label]], t(df_images[sample_index, -3073]), k), k)
+  drawImage(cld(all_pca[[sample_label]]$pc, all_pca[[sample_label]]$mean,
+                t(df_images[sample_index, -3073]), k), k)
 }
 ```
 
@@ -129,8 +133,6 @@ $$
 $$
 
 ```{r}
-pc_count = 20
-
 colors = c("darkblue", "darkcyan", "darkgreen", "darkgrey", "darkorange", "darkorchid", "darkred", "darksalmon", "darkseagreen", "darkturquoise")
 line_types = c(1, 1, 1, 2, 2, 3, 3, 4, 4, 5)
 
@@ -159,20 +161,28 @@ legend("topright", legend = label_names[,1], lwd = 1, col = colors, lty=line_typ
 
 Alternatively, we can also compute the error by making low-dimensional representation for all of the images in a given category. Then, for each image, find the per-pixel differences between the reconstruction and its original image. Square those differences individually and sum them over the whole image. Finally, calculate the mean of this value over the whole category.
 
-```{r eval=!SKIP_EXPENSIVE_COMPUTING}
-t_start = Sys.time()
+```{r}
+pca_image_error = function(images, pc, mean, k) {
+  diff = apply(images, 1, function(x){
+      return (x[-3073] - cld(pc, mean, x[-3073], k))}
+    )
+  return (mean(apply(diff, 2, function(v){return (crossprod(v, v))})))
+}
+```
 
+```{r eval=!params$load_precomputed_data}
+t_start = Sys.time()
 image_error = list()
 e = rep(0, pc_count)
 max_error = 0
 min_error = 1e+10
+pb = txtProgressBar(min = 0, max = label_count * pc_count, style = 3)
+
 for (i in 1:label_count){
   images = df_images[df_images$V3073 == i,]
   for (k in 1:pc_count){
-    diff = apply(images, 1, function(x){
-      return (x[-3073] - cld(all_pca[[x[3073]]], x[-3073], k))}
-    )
-    e[k] = mean(apply(diff, 2, function(v){return (crossprod(v, v))}))
+    e[k] = pca_image_error(images, all_pca[[i]]$pc, all_pca[[i]]$mean, k)
+    setTxtProgressBar(pb, (i - 1) * pc_count + k)
   }
   if(max(e) > max_error) max_error = max(e)
   if(min(e) < min_error) min_error = min(e)
@@ -184,7 +194,7 @@ difftime(Sys.time(), t_start)
 save(image_error, file="saved/image_error.data")
 ```
 
-```{r eval=SKIP_EXPENSIVE_COMPUTING}
+```{r eval=params$load_precomputed_data}
 load("saved/image_error.data")
 ```
 
@@ -205,6 +215,16 @@ Compute the distances between mean images for each pair of classes. Use principa
 
 We follow *Procedure 4.3* on textbook page 82 to calculate 2D coordinates.
 ```{r}
+MDS = function(D, k) {
+  size = dim(D)[1]
+  
+  A = diag(1, size, size) - matrix(1, size, size) / size
+  W = - 1/2 * A %*% D %*% t(A)
+  e = eigen(W, symmetric = TRUE)
+  
+  return (e$vectors[,1:k] %*% diag(sqrt(e$values[1:k])))
+}
+
 #Calculate distance of mean images
 D = matrix(0, nrow = label_count, ncol = label_count)
 
@@ -216,25 +236,58 @@ for (i in 1: (label_count - 1)) {
   }
 }
 #print(D)
-A = diag(1, label_count, label_count) - matrix(1, label_count, label_count) / label_count
-W = - 1/2 * A %*% D %*% t(A)
-e = eigen(W)
-V = e$vectors[,1:2] %*% diag(sqrt(e$values[1:2]))
+V = MDS(D, 2)
 
 #Offset the results so that category 1 is at the origin
 V1 = t(t(V) - V[1,])
 #rotate and scale the results so that category 2 is at (1,0);
-theta = -asin(V1[2,1]/sqrt(V1[2,1]^2 + V1[2,2]^2)) + pi/2
+theta = asin(abs(V1[2,1])/sqrt(V1[2,1]^2 + V1[2,2]^2)) + pi/2
 r  = matrix(c(cos(theta),sin(theta),-sin(theta),cos(theta)), 2, 2)  #rotation matrix
 V2 = V1 %*% r
 V3 = V2 / V2[2,1]
 
-plot(V3, xlab = "", ylab = "", col="Red", pch = 8, cex = 2, xlim = c(-0.1, 1.1))
+plot(V3, xlab = "", ylab = "", col="Red", pch = 8, cex = 1.5, xlim = c(-0.1, 1.1))
+for(i in 1:label_count){
+  text(V3[i,1], V3[i,2], label_names[i,1], offset = 0)
+}
+```
+It's amazing to see how similar objects close to each other! For example: dog, cat, deer, frog, gird and horse are all animals, they all gathered in top right corner. Automobile and truck are all vehicles and are closely positioned in the plot.
+
+# 1.3
+Here is another measure of the similarity of two classes. For class A and class B, define E(A | B) to be the average error obtained by representing all the images of class A using the mean of class A and the first 20 principal components of class B. Now define the similarity between classes to be (1/2)(E(A | B) + E(B | A)). If A and B are very similar, then this error should be small, because A's principal components should be good at representing B. But if they are very different, then A's principal components should represent B poorly. In turn, the similarity measure should be big. Use principal coordinate analysis to make a 2D map of the classes. Compare this map to the map in the previous exercise? are they different? why?
+
+```{r}
+#Calculate similarity of every classes
+D = matrix(0, nrow = label_count, ncol = label_count)
+
+images_by_category = list()
+for (i in 1:label_count) { images_by_category[[i]] = df_images[df_images$V3073 == i,] }
+
+pb = txtProgressBar(min = 0, max = sum(1:10), style = 3)
+pbc = 1
+for (i in 1: label_count) {
+  for (j in i : label_count){
+    error_1 = pca_image_error(images_by_category[[i]], all_pca[[j]]$pc, 
+                              all_pca[[i]]$mean, pc_count)
+    if(i != j) {
+      error_2 = pca_image_error(images_by_category[[j]], all_pca[[i]]$pc, 
+                                all_pca[[j]]$mean, pc_count)
+    } else{
+      error_2 = error_1
+    }
+    D[i, j] = (error_1 + error_2) / 2
+    
+    setTxtProgressBar(pb, pbc)
+    pbc = pbc + 1
+  }
+}
+
+V = MDS(D, 2)
+V3 = V
+
+plot(V3, xlab = "", ylab = "", col="Red", pch = 8, cex = 1.5, xlim = c(-0.1, 1.1))
 for(i in 1:label_count){
   text(V3[i,1], V3[i,2], label_names[i,1], offset = 0)
 }
 ```
 
-
-# 1.3
-Here is another measure of the similarity of two classes. For class A and class B, define E(A | B) to be the average error obtained by representing all the images of class A using the mean of class A and the first 20 principal components of class B. Now define the similarity between classes to be (1/2)(E(A | B) + E(B | A)). If A and B are very similar, then this error should be small, because A's principal components should be good at representing B. But if they are very different, then A's principal components should represent B poorly. In turn, the similarity measure should be big. Use principal coordinate analysis to make a 2D map of the classes. Compare this map to the map in the previous exercise? are they different? why?
