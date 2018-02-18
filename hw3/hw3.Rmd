@@ -48,7 +48,7 @@ for (f in 1:length(file_names)) {
 df_images = as.data.frame(mat_images)
 all_images = list()
 for (i in 1:label_count) { all_images[[i]] = df_images[df_images$V3073 == i,] }
-save(all_images,file="saved/images.data")
+save(all_images,file="saved/all_images.data")
 
 remove(mat_images, df_images)
 ```
@@ -72,7 +72,7 @@ drawImage = function(image, title) {
 For each category, compute the mean image and the first 20 principal components. Plot the error resulting from representing the images of each category using the first 20 principal components against the category.
 
 ```{r eval=load_precomputed_data}
-load("saved/images.data") #Load images
+load("saved/all_images.data") #Load images
 ```
 
 $$
@@ -227,6 +227,16 @@ MDS = function(D, k) {
   return (e$vectors[,1:k] %*% diag(sqrt(e$values[1:k])))
 }
 
+#Offset the results so that category 1 is at the origin, rotate and scale the results so that category 2 is at (1,0);
+transform_2d = function(V) {
+  V1 = t(t(V) - V[1,])
+ 
+  theta = asin(abs(V1[2,1])/sqrt(V1[2,1]^2 + V1[2,2]^2)) + pi/2
+  r  = matrix(c(cos(theta),sin(theta),-sin(theta),cos(theta)), 2, 2)  #rotation matrix
+  V2 = V1 %*% r
+  return (V2 / V2[2,1])
+}
+
 #Calculate distance of mean images
 D = matrix(0, nrow = label_count, ncol = label_count)
 
@@ -238,19 +248,11 @@ for (i in 1: (label_count - 1)) {
   }
 }
 #print(D)
-V = MDS(D, 2)
+V = transform_2d(MDS(D, 2))
 
-#Offset the results so that category 1 is at the origin
-V1 = t(t(V) - V[1,])
-#rotate and scale the results so that category 2 is at (1,0);
-theta = asin(abs(V1[2,1])/sqrt(V1[2,1]^2 + V1[2,2]^2)) + pi/2
-r  = matrix(c(cos(theta),sin(theta),-sin(theta),cos(theta)), 2, 2)  #rotation matrix
-V2 = V1 %*% r
-V3 = V2 / V2[2,1]
-
-plot(V3, xlab = "", ylab = "", col="Red", pch = 8, cex = 1.5, xlim = c(-0.1, 1.1))
+plot(V, xlab = "", ylab = "", col="Red", pch = 8, cex = 1.5, xlim = c(-0.1, 1.1))
 for(i in 1:label_count){
-  text(V3[i,1], V3[i,2], label_names[i,1], offset = 0)
+  text(V[i,1], V[i,2], label_names[i,1], offset = 0)
 }
 ```
 It's amazing to see how similar objects close to each other! For example: dog, cat, deer, frog, gird and horse are all animals, they all gathered in top right corner. Automobile and truck are all vehicles and are closely positioned in the plot.
@@ -260,7 +262,7 @@ Here is another measure of the similarity of two classes. For class A and class 
 
 ```{r}
 #Calculate similarity of every classes
-D = matrix(0, nrow = label_count, ncol = label_count)
+D1 = matrix(0, nrow = label_count, ncol = label_count)
 
 pb = txtProgressBar(min = 0, max = sum(1:10), style = 3)
 pbc = 1
@@ -277,19 +279,18 @@ for (i in 1: label_count) {
       D[i, j] = image_error[[i]][pc_count]  #Use the previously computed error
     }
     
-    
     setTxtProgressBar(pb, pbc)
     pbc = pbc + 1
   }
 }
-
-V = MDS(D, 2)
-V3 = V
-
-plot(V3, xlab = "", ylab = "", col="Red", pch = 8, cex = 1.5, xlim = c(-0.1, 1.1))
-for(i in 1:label_count){
-  text(V3[i,1], V3[i,2], label_names[i,1], offset = 0)
-}
 ```
 
+```{r}
+V = transform_2d(MDS(D, 2))
+
+plot(V, xlab = "", ylab = "", col="Red", pch = 8, cex = 1.5)
+for(i in 1:label_count){
+  text(V[i,1], V[i,2], label_names[i,1], offset = 0)
+}
+```
 
