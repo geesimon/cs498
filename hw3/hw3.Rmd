@@ -40,14 +40,17 @@ for (f in 1:length(file_names)) {
     mat_images[index, 1: image_bytes] = as.integer(readBin(to.read, raw(), size=1, 
                                                         n=image_bytes, endian="big"))
     mat_images[index, image_bytes + 1] = l + 1
-    #df_images = rbind(df_images, mat_images[index,])
     index = index + 1
   }
   close(to.read)
 }
 
 df_images = as.data.frame(mat_images)
-save(df_images,file="saved/images.df")
+all_images = list()
+for (i in 1:label_count) { all_images[[i]] = df_images[df_images$V3073 == i,] }
+save(all_images,file="saved/images.data")
+
+remove(mat_images, df_images)
 ```
 
 ```{r}
@@ -69,7 +72,7 @@ drawImage = function(image, title) {
 For each category, compute the mean image and the first 20 principal components. Plot the error resulting from representing the images of each category using the first 20 principal components against the category.
 
 ```{r eval=load_precomputed_data}
-load("saved/images.df") #Load images
+load("saved/images.data") #Load images
 ```
 
 $$
@@ -101,10 +104,10 @@ all_pca = list()
 pb = txtProgressBar(min = 0, max = label_count, style = 3)
 
 for (i in 1:label_count) {
-  all_pca[[i]] = eigen_pca(df_images[df_images$V3073 == i, -3073])
+  all_pca[[i]] = eigen_pca(all_images[[i]][, -3073])
   setTxtProgressBar(pb, i)
 }
-difftime(Sys.time(), t_start)
+cat(paste("\nTime Spent:", difftime(Sys.time(), t_start), units="secs"), "Seconds")
 save(all_pca, file="saved/pca.data")
 ```
 To illustrate how well low-dimensional representation works, we approximate a sample image (Dear) by the mean and some principal components. Notice how good the approximation becomes with relatively few components (100 vs. 3072).
@@ -113,16 +116,16 @@ load("saved/pca.data")
 ```
 
 ```{r}
-sample_index = 3000
-sample_label = df_images[sample_index, 3073]
+sample_index = 311
+sample_label = 5
 par(mfrow=c(2,5))
 par(mar = c(1,1,1,1))
 
-drawImage(df_images[sample_index, -3073], "Original")
+drawImage(all_images[[sample_label]][sample_index, -3073], "Original")
 drawImage(all_pca[[sample_label]]$mean, "Mean")
 for (k in c(1, 5, 10, 15, 20, 100, 150, 200)){
   drawImage(cld(all_pca[[sample_label]]$pc, all_pca[[sample_label]]$mean,
-                t(df_images[sample_index, -3073]), k), k)
+                t(all_images[[sample_label]][sample_index, -3073]), k), k)
 }
 ```
 
@@ -179,9 +182,9 @@ min_error = 1e+10
 pb = txtProgressBar(min = 0, max = label_count * pc_count, style = 3)
 
 for (i in 1:label_count){
-  images = df_images[df_images$V3073 == i,]
+  #images = df_images[df_images$V3073 == i,]
   for (k in 1:pc_count){
-    e[k] = pca_image_error(images, all_pca[[i]]$pc, all_pca[[i]]$mean, k)
+    e[k] = pca_image_error(all_images[[i]], all_pca[[i]]$pc, all_pca[[i]]$mean, k)
     setTxtProgressBar(pb, (i - 1) * pc_count + k)
   }
   if(max(e) > max_error) max_error = max(e)
@@ -189,8 +192,7 @@ for (i in 1:label_count){
   image_error[[i]] = e
 }
 
-difftime(Sys.time(), t_start)
-
+cat(paste("\nTime Spent:", difftime(Sys.time(), t_start), units="secs"), "Seconds")
 save(image_error, file="saved/image_error.data")
 ```
 
@@ -260,22 +262,21 @@ Here is another measure of the similarity of two classes. For class A and class 
 #Calculate similarity of every classes
 D = matrix(0, nrow = label_count, ncol = label_count)
 
-images_by_category = list()
-for (i in 1:label_count) { images_by_category[[i]] = df_images[df_images$V3073 == i,] }
-
 pb = txtProgressBar(min = 0, max = sum(1:10), style = 3)
 pbc = 1
 for (i in 1: label_count) {
   for (j in i : label_count){
-    error_1 = pca_image_error(images_by_category[[i]], all_pca[[j]]$pc, 
-                              all_pca[[i]]$mean, pc_count)
     if(i != j) {
-      error_2 = pca_image_error(images_by_category[[j]], all_pca[[i]]$pc, 
+      error_1 = pca_image_error(all_images[[i]], all_pca[[j]]$pc, 
+                              all_pca[[i]]$mean, pc_count)
+      error_2 = pca_image_error(all_images[[j]], all_pca[[i]]$pc, 
                                 all_pca[[j]]$mean, pc_count)
+      D[i, j] = (error_1 + error_2) / 2
+      D[j, i] = D[i, j]
     } else{
-      error_2 = error_1
+      D[i, j] = image_error[[i]][pc_count]  #Use the previously computed error
     }
-    D[i, j] = (error_1 + error_2) / 2
+    
     
     setTxtProgressBar(pb, pbc)
     pbc = pbc + 1
@@ -290,4 +291,5 @@ for(i in 1:label_count){
   text(V3[i,1], V3[i,2], label_names[i,1], offset = 0)
 }
 ```
+
 
