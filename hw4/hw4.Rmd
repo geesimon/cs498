@@ -13,24 +13,62 @@ output:
 
 You can find a dataset dealing with European employment in 1979 at http://lib.stat.cmu.edu/DASL/Stories/EuropeanJobs.html. This dataset gives the percentage of people employed in each of a set of areas in 1979 for each of a set of European countries. Notice this dataset contains only 26 data points.
 
-##1
+##Part (1)
 Use an agglomerative clusterer to cluster this data. Produce a dendrogram of this data for each of single link, complete link, and group average clustering. 
 
 ```{r, message=FALSE}
+library(readr)
 EuropeanJobs = read_csv("EuropeanJobs.csv")
-#head(EuropeanJobs)
-
-plot(hclust(dist(EuropeanJobs[,-1]), method = "single"), labels=EuropeanJobs$Country)
-plot(hclust(dist(EuropeanJobs[,-1]), method = "complete"), labels=EuropeanJobs$Country)
-plot(hclust(dist(EuropeanJobs[,-1]), method = "average"), labels=EuropeanJobs$Country)
+Countries = EuropeanJobs$Country
+JobsStat = EuropeanJobs[, -1]
+d = dist(JobsStat)
+```
+```{r}
+plot(hclust(d, method = "single"), labels = Countries, main = "Single Link Clustering", xlab = "")
 ```
 
+- This clustering expose **Turkey** as a very special single node cluster against every other countries. It makes some sense as Turkey is a country span both Asia and Europe.
 
-We will label the countries on the axis. What structure in the data does each method expose? it's fine to look for code, rather than writing your own. Hint: I made plots I liked a lot using R's hclust clustering function, and then turning the result into a phylogenetic tree and using a fan plot, a trick I found on the web; try plot(as.phylo(hclustresult), type='fan'). You should see dendrograms that "make sense" (at least if you remember some European history), and have interesting differences.
+```{r}
+plot(hclust(d, method = "complete"), labels = Countries, main = "Complete Link Clustering", xlab = "")
+```
 
-##2
-Using k-means, cluster this dataset. What is a good choice of k for this data and why?
+- From some height, this clustering makes Turkey, Greece and Yugoslavia one cluster, Rumania, Czechoslovakia, USSR etc a second cluster and the rest counties a 3rd cluster If we check the history, countries in the second cluster are most socialism countries at that time (except Spain, Portugal and Ireland) and also close to each other. Countries in the 3rd cluster are  capitalism countries except East Germany which is closely grouped with West Germany (since they were one country). 
+- Countries close to each other will more likely to be clustered together. For example: East Germany and West Germany. Netherlands, Norway, Denmark and Sweden. Belgium and United Kingdom.
 
+```{r}
+plot(hclust(d, method = "average"), labels = Countries, main = "Group Average Clustering", xlab = "")
+```
+
+- The results of this clustering is very similar to the Complete Link Clustering.
+
+##Part (2)
+Using k-means, cluster this dataset. determine what is a good choice of k for this data.
+
+We make plot of the cost (total within-cluster sum of squares) for different values of k. 
+
+```{r}
+ws = lapply(1:(nrow(JobsStat) - 1), function(x){kmeans(JobsStat, centers = x)$tot.withinss})
+
+plot(1:(nrow(JobsStat) - 1), ws, type="o", xlab = "Number of Clusters", ylab = "Within groups sum of squares", pch = 20)
+```
+Notice there is a sharp drop in cost from k = 1 to k = 3. After that, the cost falls off slowly. This suggests using k = 3 or k = 4 are the good choices for k.
 
 #Problem 2
-Do exercise 6.2 in the Jan 15 version of the course text
+Obtain the activities of daily life dataset from the UC Irvine machine learning
+website (https://archive.ics.uci.edu/ml/datasets/Dataset+for+ADL+Recognition+with+Wrist-worn+Accelerometer
+data provided by Barbara Bruno, Fulvio Mastrogiovanni and Antonio Sgor-
+bissa).
+
+##Part (a)
+Build a classifier that classifies sequences into one of the 14 activities provided. To make features, you should vector quantize, then use a histogram
+of cluster centers (as described in the subsection; this gives a pretty explicit set of steps to follow). You will find it helpful to use hierarchical
+k-means to vector quantize. You may use whatever multi-class classifier
+you wish, though I’d start with R’s decision forest, because it’s easy to
+use and effective. You should report (a) the total error rate and (b) the
+class confusion matrix of your classifier.
+
+##Part (b)
+Now see if you can improve your classifier by (a) modifying the number
+of cluster centers in your hierarchical k-means and (b) modifying the size
+of the fixed length samples that you use.
