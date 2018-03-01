@@ -60,6 +60,33 @@ website (https://archive.ics.uci.edu/ml/datasets/Dataset+for+ADL+Recognition+wit
 data provided by Barbara Bruno, Fulvio Mastrogiovanni and Antonio Sgor-
 bissa).
 
+Let's load all data to a data frame.
+```{r}
+ActivityLabels = c("Brush_teeth", "Climb_stairs", "Comb_hair", "Descend_stairs",
+                   "Drink_glass", "Eat_meat", "Eat_soup", "Getup_bed", 
+                   "Liedown_bed", "Pour_water", "Sitdown_chair", 
+                   "Standup_chair", "Use_telephone", "Walk")
+DataFolderName = "HMP_Dataset"
+AllData = list()
+
+for (i in 1:length(ActivityLabels)){
+  label = ActivityLabels[i]
+  folder_name = paste("./HMP_Dataset/", label, sep = "")
+  file_names = dir(folder_name)
+  for (j in 1:length(file_names)){
+    full_file_name = paste(folder_name, "/", file_names[j], sep = "")
+    data =  read_delim(full_file_name, " ", col_names = c("X", "Y", "Z"), 
+                       col_types = cols(X="i", Y="i", Z="i"), trim_ws = TRUE)
+    if(j == 1) {
+      AllData[[label]] = data
+    } else{
+       AllData[[label]] = rbind(AllData[[label]], data)
+    }
+  }
+}
+```
+
+
 ##Part (a)
 Build a classifier that classifies sequences into one of the 14 activities provided. To make features, you should vector quantize, then use a histogram
 of cluster centers (as described in the subsection; this gives a pretty explicit set of steps to follow). You will find it helpful to use hierarchical
