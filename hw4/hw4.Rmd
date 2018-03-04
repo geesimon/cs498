@@ -48,11 +48,12 @@ Using k-means, cluster this dataset. determine what is a good choice of k for th
 We make plot of the cost (total within-cluster sum of squares) for different values of k. 
 
 ```{r}
+set.seed(1972)
 ws = lapply(1:(nrow(JobsStat) - 1), function(x){kmeans(JobsStat, centers = x)$tot.withinss})
 
 plot(1:(nrow(JobsStat) - 1), ws, type="o", xlab = "Number of Clusters", ylab = "Within groups sum of squares", pch = 20)
 ```
-Notice there is a sharp drop in cost from k = 1 to k = 3. After that, the cost falls off slowly. This suggests using k = 3 or k = 4 are the good choices for k.
+Notice there is a sharp drop in cost from k = 1 to k = 4. After that, the cost falls off slowly. This suggests using k = 4 or k = 5 are the good choices for k. The plots from part (1) support this conclusion.
 
 #Problem 2
 Obtain the activities of daily life dataset from the UC Irvine machine learning
@@ -60,30 +61,109 @@ website (https://archive.ics.uci.edu/ml/datasets/Dataset+for+ADL+Recognition+wit
 data provided by Barbara Bruno, Fulvio Mastrogiovanni and Antonio Sgor-
 bissa).
 
-Let's load all data to a data frame.
+Let's load all data and split them among training and test dataset.
 ```{r}
 ActivityLabels = c("Brush_teeth", "Climb_stairs", "Comb_hair", "Descend_stairs",
                    "Drink_glass", "Eat_meat", "Eat_soup", "Getup_bed", 
                    "Liedown_bed", "Pour_water", "Sitdown_chair", 
                    "Standup_chair", "Use_telephone", "Walk")
 DataFolderName = "HMP_Dataset"
-AllData = list()
+#AllData = list()
+AllRawData = list()
+RawTrainData = list()
+RawTestData = list()
+
+# for (i in 1:length(ActivityLabels)){
+#   label = ActivityLabels[i]
+#   folder_name = paste("./HMP_Dataset/", label, sep = "")
+#   file_names = dir(folder_name)
+#   for (j in 1:length(file_names)){
+#     full_file_name = paste(folder_name, "/", file_names[j], sep = "")
+#     data =  read_delim(full_file_name, " ", col_names = c("X", "Y", "Z"),
+#                        col_types = cols(X="i", Y="i", Z="i"), trim_ws = TRUE)
+#     if(j == 1) {
+#       AllData[[label]] = data
+#     } else{
+#        AllData[[label]] = rbind(AllData[[label]], data)
+#     }
+#   }
+# }
+set.seed(19720816)
 
 for (i in 1:length(ActivityLabels)){
+  activity_data = list()
   label = ActivityLabels[i]
   folder_name = paste("./HMP_Dataset/", label, sep = "")
   file_names = dir(folder_name)
   for (j in 1:length(file_names)){
     full_file_name = paste(folder_name, "/", file_names[j], sep = "")
-    data =  read_delim(full_file_name, " ", col_names = c("X", "Y", "Z"), 
+    data =  read_delim(full_file_name, " ", col_names = c("X", "Y", "Z"),
                        col_types = cols(X="i", Y="i", Z="i"), trim_ws = TRUE)
-    if(j == 1) {
-      AllData[[label]] = data
-    } else{
-       AllData[[label]] = rbind(AllData[[label]], data)
-    }
+    activity_data[[j]] = data
   }
+  AllRawData[[i]] = activity_data
 }
+
+#Sample 80% as training data and the rest 20% as test data. Save them to RawTrainData and RawTestData
+for (i in 1:length(ActivityLabels)){
+  all_indexes = 1:(length(AllRawData[[i]]))
+  #train_indexes = sample(all_indexes, floor((length(AllRawData[[i]])) * 0.8))
+  train_indexes = 1:(floor((length(AllRawData[[i]])) * 0.8))
+  test_indexes = all_indexes[-train_indexes]
+  train_data = list()
+  test_data = list()
+  for(j in 1:length(train_indexes)){
+    train_data[[j]] = AllRawData[[i]][[train_indexes[j]]]
+  }
+  for(j in 1:length(test_indexes)){
+    test_data[[j]] = AllRawData[[i]][[test_indexes[j]]]
+  }
+  RawTrainData[[i]] = train_data
+  RawTestData[[i]] = test_data
+}
+```
+
+
+```{r}
+#Cut nx3 dataframe as samples vectors
+cut.as.vector = function(df3, sample_length){
+  row_count = floor(dim(df3)[1] / sample_length)
+  m_data = matrix(0, row_count, sample_length * 3)
+  
+  index = 1
+  for(i in 1:row_count){
+    d = df3[index:(index + sample_length -1),]
+    d = as.matrix(d)
+    dim(d) = c(sample_length * 3, 1)
+    d = as.vector(d)
+    m_data[i,] = d
+    
+    index = index + sample_length
+  }
+  
+  return (m_data)
+}
+
+# Cut activity data as fixed size data
+cut.listdf = function(ll_df, sample_length){
+  new_ll_df = list()
+
+  for (i in 1:length(ll_df)){
+    activity_data = list()
+    for (j in 1:length(ll_df[[i]])){
+      activity_data[[j]] = cut.as.vector(ll_df[[i]][[j]], sample_length)
+    }
+    new_ll_df[[i]] = activity_data
+  }
+  
+  return (new_ll_df)
+}
+```
+
+#Cut data to fix-size vector (32*3)
+```{r}
+TrainData = cut.listdf(RawTrainData, 32)
+TestData = cut.listdf(RawTestData, 32)
 ```
 
 
@@ -94,6 +174,28 @@ k-means to vector quantize. You may use whatever multi-class classifier
 you wish, though I’d start with R’s decision forest, because it’s easy to
 use and effective. You should report (a) the total error rate and (b) the
 class confusion matrix of your classifier.
+
+We build a dictionary by clustering the training data with $$k=480$$.
+```{r}
+#Merge all training data
+all_data = data.frame()
+for (i in 1:length(TrainData)){
+  for (j in 1:length(TrainData[[i]])){
+    all_data = rbind(all_data, TrainData[[i]][[j]])
+  }
+}
+
+set.seed(1972)
+km = kmeans(all_data, centers = 480)
+```
+
+We vector quantize training and test dataset
+```{r}
+vq = function(data, centers){
+  
+}
+```
+
 
 ##Part (b)
 Now see if you can improve your classifier by (a) modifying the number
