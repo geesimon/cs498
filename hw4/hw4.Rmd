@@ -6,6 +6,8 @@ output:
   html_document:
     toc: yes
   pdf_document: default
+params:
+  load_precomputed_data: no
 ---
 
 
@@ -210,11 +212,11 @@ HistTrainData = featurize_data(TrainData, km$centers)
 HistTestData = featurize_data(TestData, km$centers)
 ```
 
-```{r}
+```{r eval=!params$load_precomputed_data}
 library(h2o)
 
 set.seed(19720816)
-calculate_accuracy = function(train_frame, test_frame, ntrees, max_depths) {
+get_best_classifier = function(train_frame, test_frame, ntrees, max_depths) {
   accuracies = rep(0, length(ntrees) * length(max_depths))
   models = list()
   
@@ -231,7 +233,10 @@ calculate_accuracy = function(train_frame, test_frame, ntrees, max_depths) {
     }
   }
   
-  return (list(accuracies = accuracies, models = models))
+  accuracy = max(accuracies)
+  model = models[[which.max(accuracies)]]
+  
+  return (list(accuracy = accuracy, model = model))
 }
 
 h2o.init(nthreads=-1, max_mem_size = "2G")
@@ -243,16 +248,23 @@ HistTestData$label = as.factor(ActivityLabels[HistTestData$label])
 h2o_train_data = as.h2o(HistTrainData)
 h2o_test_data = as.h2o(HistTestData)
 
-result = calculate_accuracy(h2o_train_data, h2o_test_data, c(10, 20, 30), c(4, 8, 16))
+result = get_best_classifier(h2o_train_data, h2o_test_data, c(10, 20, 30), c(4, 8, 16))
+result[["CM"]] = h2o.confusionMatrix(result$model)
 
+save(result, file="result.data")
+h2o.shutdown(prompt=FALSE)
 ```
-- Error rate: $`r max(result$accuracies)`$
 
-Confusion Matrix
 ```{r}
-h2o.confusionMatrix(result$models[[which.max(result$accuracies)]])
+#load("result.data")
+
+error_rate = 1 - result[["accuracy"]]
 ```
 
+- Error rate: 
+
+- Confusion Matrix:
+$`r result[["CM"]]`$
 
 ##Part (b)
 Now see if you can improve your classifier by (a) modifying the number
