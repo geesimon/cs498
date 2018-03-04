@@ -68,27 +68,9 @@ ActivityLabels = c("Brush_teeth", "Climb_stairs", "Comb_hair", "Descend_stairs",
                    "Liedown_bed", "Pour_water", "Sitdown_chair", 
                    "Standup_chair", "Use_telephone", "Walk")
 DataFolderName = "HMP_Dataset"
-#AllData = list()
 AllRawData = list()
 RawTrainData = list()
 RawTestData = list()
-
-# for (i in 1:length(ActivityLabels)){
-#   label = ActivityLabels[i]
-#   folder_name = paste("./HMP_Dataset/", label, sep = "")
-#   file_names = dir(folder_name)
-#   for (j in 1:length(file_names)){
-#     full_file_name = paste(folder_name, "/", file_names[j], sep = "")
-#     data =  read_delim(full_file_name, " ", col_names = c("X", "Y", "Z"),
-#                        col_types = cols(X="i", Y="i", Z="i"), trim_ws = TRUE)
-#     if(j == 1) {
-#       AllData[[label]] = data
-#     } else{
-#        AllData[[label]] = rbind(AllData[[label]], data)
-#     }
-#   }
-# }
-set.seed(19720816)
 
 for (i in 1:length(ActivityLabels)){
   activity_data = list()
@@ -104,11 +86,12 @@ for (i in 1:length(ActivityLabels)){
   AllRawData[[i]] = activity_data
 }
 
+set.seed(19720816)
 #Sample 80% as training data and the rest 20% as test data. Save them to RawTrainData and RawTestData
 for (i in 1:length(ActivityLabels)){
   all_indexes = 1:(length(AllRawData[[i]]))
-  #train_indexes = sample(all_indexes, floor((length(AllRawData[[i]])) * 0.8))
-  train_indexes = 1:(floor((length(AllRawData[[i]])) * 0.8))
+  train_indexes = sample(all_indexes, floor((length(AllRawData[[i]])) * 0.8))
+  #train_indexes = 1:(floor((length(AllRawData[[i]])) * 0.8))
   test_indexes = all_indexes[-train_indexes]
   train_data = list()
   test_data = list()
@@ -189,11 +172,85 @@ set.seed(1972)
 km = kmeans(all_data, centers = 480)
 ```
 
-We vector quantize training and test dataset
+We vector quantize training and test dataset and compute the histgram of these dataset as features.
 ```{r}
-vq = function(data, centers){
+vector_quantize = function(df, centers){
+  df = as.matrix(df)
+  centers = as.matrix(centers)
+  cv = rep(0, dim(df)[1])
   
+  for (i in 1:(dim(df)[1])){
+    c = t(centers) - df[i,]
+    d = colSums(c^2)
+    cv[i] = which.min(d)
+  }
+  return (cv)
 }
+
+#Compute histgram of the data and assign label number. This will make feature vectors for classification.
+featurize_data = function(ll_df, centers){
+  all_features = data.frame()
+  sample_interval = seq(0, dim(centers)[1], 1)
+
+  for (i in 1:length(ll_df)){
+    df = data.frame()
+
+    mv = matrix(0, length(ll_df[[i]]), length(sample_interval) - 1)
+    for (j in 1:length(ll_df[[i]])){
+      mv[j,] = hist(vector_quantize(ll_df[[i]][[j]], centers), breaks = sample_interval, 
+                          plot = FALSE)$density
+    }
+    all_features = rbind(all_features, cbind(as.data.frame(mv),label=i))
+  }
+  
+  return (all_features)
+}
+
+HistTrainData = featurize_data(TrainData, km$centers)
+HistTestData = featurize_data(TestData, km$centers)
+```
+
+```{r}
+library(h2o)
+
+set.seed(19720816)
+calculate_accuracy = function(train_frame, test_frame, ntrees, max_depths) {
+  accuracies = rep(0, length(ntrees) * length(max_depths))
+  models = list()
+  
+  index = 1
+  for (ntree in 1:length(ntrees)) {
+    for (depth in 1:length(max_depths)) {
+      rf = h2o.randomForest(y = "label", training_frame = train_frame, ntrees = ntrees[ntree], 
+                            max_depth = max_depths[depth])
+      prediction = h2o.predict(rf, newdata = test_frame[-dim(test_frame)[2]])
+      
+      models[[index]] = rf
+      accuracies[index] = sum(prediction[,1] == test_frame["label"]) / dim(test_frame)[1]
+      index = index + 1
+    }
+  }
+  
+  return (list(accuracies = accuracies, models = models))
+}
+
+h2o.init(nthreads=-1, max_mem_size = "2G")
+h2o.removeAll()
+
+HistTrainData$label = as.factor(ActivityLabels[HistTrainData$label])
+HistTestData$label = as.factor(ActivityLabels[HistTestData$label])
+
+h2o_train_data = as.h2o(HistTrainData)
+h2o_test_data = as.h2o(HistTestData)
+
+result = calculate_accuracy(h2o_train_data, h2o_test_data, c(10, 20, 30), c(4, 8, 16))
+
+```
+- Error rate: $`r max(result$accuracies)`$
+
+Confusion Matrix
+```{r}
+h2o.confusionMatrix(result$models[[which.max(result$accuracies)]])
 ```
 
 
@@ -201,3 +258,9 @@ vq = function(data, centers){
 Now see if you can improve your classifier by (a) modifying the number
 of cluster centers in your hierarchical k-means and (b) modifying the size
 of the fixed length samples that you use.
+
+
+```{r}
+
+```
+
