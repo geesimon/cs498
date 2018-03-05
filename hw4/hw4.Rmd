@@ -33,13 +33,13 @@ d = dist(JobsStat)
 plot(hclust(d, method = "single"), labels = Countries, main = "Single Link Clustering", xlab = "")
 ```
 
-- This clustering expose **Turkey** as a very special single node cluster against every other countries. It makes some sense as Turkey is a country span both Asia and Europe.
+- This clustering expose Turkey as a very special single node cluster against every other countries. It makes some sense as Turkey is a country span both Asia and Europe.
 
 ```{r}
 plot(hclust(d, method = "complete"), labels = Countries, main = "Complete Link Clustering", xlab = "")
 ```
 
-- From some height, this clustering makes Turkey, Greece and Yugoslavia one cluster. Romania, Czechoslovakia, USSR etc a second cluster and the rest counties a 3rd cluster If we check the history, countries in the second cluster are most socialism countries at that time (except Spain, Portugal and Ireland) and also close to each other. Countries in the 3rd cluster are  capitalism countries except East Germany which is closely grouped with West Germany (since they were one country). 
+- From some height level, this clustering makes Turkey, Greece and Yugoslavia one cluster. Romania, Czechoslovakia, USSR etc a second cluster and the rest counties a 3rd cluster. If we check the history, countries in the second cluster are most socialism countries at that time (except Spain, Portugal and Ireland) and also close to each other. Countries in the 3rd cluster are  capitalism countries except East Germany which is closely grouped with West Germany (since they were one country). 
 - Countries close to each other will more likely to be clustered together. For example: East Germany and West Germany. Netherlands, Norway, Denmark and Sweden. Belgium and United Kingdom.
 
 ```{r}
@@ -57,9 +57,11 @@ We make plot of the cost (total within-cluster sum of squares) for different val
 set.seed(1972)
 ws = lapply(1:(nrow(JobsStat) - 1), function(x){kmeans(JobsStat, centers = x)$tot.withinss})
 
-plot(1:(nrow(JobsStat) - 1), ws, type="o", xlab = "Number of Clusters", ylab = "Within groups sum of squares", pch = 20)
+plot(1:(nrow(JobsStat) - 1), ws, type="o", xlab = "Number of Clusters", 
+     ylab = "Within groups sum of squares", pch = 20)
 ```
-Notice there is a sharp drop in cost from k = 1 to k = 4. After that, the cost falls off slowly. This suggests using k = 4 or k = 5 are the good choices for k. The plots from part (1) support this conclusion.
+
+- Notice there is a sharp drop in cost from k = 1 to k = 4. After that, the cost falls off slowly. This suggests using k = 4 or k = 5 are the good choices for k. The plots from part (1) support this conclusion.
 
 #Problem 2
 Obtain the activities of daily life dataset from the UC Irvine machine learning
@@ -96,7 +98,6 @@ set.seed(19720816)
 for (i in 1:length(ActivityLabels)){
   all_indexes = 1:(length(AllRawData[[i]]))
   train_indexes = sample(all_indexes, floor((length(AllRawData[[i]])) * 0.8))
-  #train_indexes = 1:(floor((length(AllRawData[[i]])) * 0.8))
   test_indexes = all_indexes[-train_indexes]
   train_data = list()
   test_data = list()
@@ -113,7 +114,7 @@ for (i in 1:length(ActivityLabels)){
 
 
 ```{r}
-#Cut nx3 dataframe as samples vectors
+#Cut n*3 dataframe as samples vectors
 cut.as.vector = function(df3, sample_length){
   row_count = floor(dim(df3)[1] / sample_length)
   m_data = matrix(0, row_count, sample_length * 3)
@@ -148,7 +149,7 @@ cut.listdf = function(ll_df, sample_length){
 }
 ```
 
-Cut data to fix-size vector (32*3)
+Cut data to fixed size vector (32*3)
 ```{r}
 TrainData = cut.listdf(RawTrainData, 32)
 TestData = cut.listdf(RawTestData, 32)
@@ -156,7 +157,6 @@ TestData = cut.listdf(RawTestData, 32)
 
 ##Part (a) - Build a classifier that classifies sequences into one of the 14 activities provided
 
-We build a dictionary by clustering the training data with $k=480$.
 ```{r}
 #Merge all training data
 merge_list_df = function (ll_df) {
@@ -169,22 +169,6 @@ merge_list_df = function (ll_df) {
   return (all_df)
 }
 
-AllTrainDF = merge_list_df(TrainData)
-
-# AllTrainDF = data.frame()
-# for (i in 1:length(TrainData)){
-#   for (j in 1:length(TrainData[[i]])){
-#     AllTrainDF = rbind(AllTrainDF, TrainData[[i]][[j]])
-#   }
-# }
-
-set.seed(1972)
-library(factoextra)
-km = hkmeans(AllTrainDF, 480)
-```
-
-We vector quantize training and test dataset and compute the histgram of these dataset to build features for later classification.
-```{r}
 vector_quantize = function(df, centers){
   df = as.matrix(df)
   centers = as.matrix(centers)
@@ -216,7 +200,17 @@ featurize_data = function(ll_df, centers){
   
   return (all_features)
 }
+```
+We build a dictionary by clustering the training data with $k=480$.
+```{r, eval=!params$load_precomputed_data}
+AllTrainDF = merge_list_df(TrainData)
 
+library(factoextra)
+km = hkmeans(AllTrainDF, 480)
+```
+
+We vector quantize training and test dataset and compute the histgram of the centers for each dataset. This is to build features for later classification.
+```{r, eval=!params$load_precomputed_data}
 HistTrainData = featurize_data(TrainData, km$centers)
 HistTestData = featurize_data(TestData, km$centers)
 ```
@@ -263,7 +257,7 @@ result[["CM"]] = h2o.confusionMatrix(result$model)
 save(result, file="result.data")
 ```
 
-```{r}
+```{r, echo=FALSE}
 load(file="result.data")
 ```
 
@@ -283,7 +277,7 @@ cluster_number = c(300, 480, 500, 700, 800, 900, 1000)
 accuracies = rep(0, length(cluster_number))
 
 for (i in 1:length(cluster_number)){
-  km = kmeans(AllTrainDF, centers = cluster_number[i])
+  km = hkmeans(AllTrainDF, cluster_number[i])
   hist_train_data = featurize_data(TrainData, km$centers)
   hist_test_data = featurize_data(TestData, km$centers)
 
@@ -303,15 +297,15 @@ improve_result_1 = list(cluster_number = cluster_number, accuracies = accuracies
 save(improve_result_1, file = "improve_result_1.data")
 ```
 
-```{r echo=FALSE}
+```{r, echo=FALSE}
 load("improve_result_1.data")
 ```
 
-We see cluster of $`r improve_result_1[["cluster_number"]][which.max(improve_result_1[["accuracies"]])]`$ gives us the best accuracy $`r max(improve_result_1[["accuracies"]])`$.
+This experiment shows cluster of $`r improve_result_1[["cluster_number"]][which.max(improve_result_1[["accuracies"]])]`$ improved the accuracy to:$`r max(improve_result_1[["accuracies"]])`$.
 
 ### 2.Modifying the size of the fixed length samples
 ```{r, eval=!params$load_precomputed_data}
-sample_size = c(8, 16, 24, 32, 40, 48, 64)
+sample_size = c(8, 16, 24, 32, 40, 48,  64)
 accuracies = rep(0, length(sample_size))
 
 for (i in 1:length(sample_size)){
@@ -337,13 +331,12 @@ for (i in 1:length(sample_size)){
 
 improve_result_2 = list(sample_size = sample_size, accuracies = accuracies)
 save(improve_result_2, file = "improve_result_2.data")
-
 ```
 
-```{r echo=FALSE}
+```{r, echo=FALSE}
 load("improve_result_2.data")
 ```
-We see sample size of $`r improve_result_2[["sample_size"]][which.max(improve_result_2[["accuracies"]])]`$ gives us the best accuracy $`r max(improve_result_2[["accuracies"]])`$.
+This experiment shows sample size of $`r improve_result_2[["sample_size"]][which.max(improve_result_2[["accuracies"]])]`$ improved the accuracy to:$`r max(improve_result_2[["accuracies"]])`$.
 
 ```{r, eval=!params$load_precomputed_data, echo = FALSE}
 h2o.shutdown(prompt=FALSE)
