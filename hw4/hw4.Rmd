@@ -3,9 +3,9 @@ title: "Homework 1"
 author: "CS 498, Spring 2018, Xiaoming Ji"
 date: ''
 output:
+  pdf_document: default
   html_document:
     toc: yes
-  pdf_document: default
 params:
   load_precomputed_data: yes
 ---
@@ -30,20 +30,23 @@ JobsStat = EuropeanJobs[, -1]
 d = dist(JobsStat)
 ```
 ```{r}
-plot(hclust(d, method = "single"), labels = Countries, main = "Single Link Clustering", xlab = "")
+plot(hclust(d, method = "single"), labels = Countries, main = "Single Link Clustering", 
+     xlab = "")
 ```
 
 - This clustering expose Turkey as a very special single node cluster against every other countries. It makes some sense as Turkey is a country span both Asia and Europe.
 
 ```{r}
-plot(hclust(d, method = "complete"), labels = Countries, main = "Complete Link Clustering", xlab = "")
+plot(hclust(d, method = "complete"), labels = Countries, 
+     main = "Complete Link Clustering", xlab = "")
 ```
 
 - From some height level, this clustering makes Turkey, Greece and Yugoslavia one cluster. Romania, Czechoslovakia, USSR etc a second cluster and the rest counties a 3rd cluster. If we check the history, countries in the second cluster are most socialism countries at that time (except Spain, Portugal and Ireland) and also close to each other. Countries in the 3rd cluster are  capitalism countries except East Germany which is closely grouped with West Germany (since they were one country). 
 - Countries close to each other will more likely to be clustered together. For example: East Germany and West Germany. Netherlands, Norway, Denmark and Sweden. Belgium and United Kingdom.
 
 ```{r}
-plot(hclust(d, method = "average"), labels = Countries, main = "Group Average Clustering", xlab = "")
+plot(hclust(d, method = "average"), labels = Countries, 
+     main = "Group Average Clustering", xlab = "")
 ```
 
 - The results of this clustering is very similar to the Complete Link Clustering.
@@ -94,7 +97,8 @@ for (i in 1:length(ActivityLabels)){
 }
 
 set.seed(19720816)
-#Sample 80% as training data and the rest 20% as test data. Save them to RawTrainData and RawTestData
+# Sample 80% as training data and the rest 20% as test data. Save them to RawTrainData 
+# and RawTestData
 for (i in 1:length(ActivityLabels)){
   all_indexes = 1:(length(AllRawData[[i]]))
   train_indexes = sample(all_indexes, floor((length(AllRawData[[i]])) * 0.8))
@@ -182,7 +186,8 @@ vector_quantize = function(df, centers){
   return (cv)
 }
 
-#Compute histgram of the data and assign label number. This will make feature vectors for classification.
+# Compute histgram of the data and assign label number. This will make 
+# feature vectors for classification.
 featurize_data = function(ll_df, centers){
   all_features = data.frame()
   sample_interval = seq(0, dim(centers)[1], 1)

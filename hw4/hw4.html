@@ -426,11 +426,11 @@ save(result, file=&quot;result.data&quot;)</code></pre>
 <h2>Part (b) - Improve classifier</h2>
 <div id="modifying-the-number-of-cluster-centers-in-k-means" class="section level3">
 <h3>1.Modifying the number of cluster centers in k-means</h3>
-<pre class="r"><code>cluster_number = c(300, 480, 500, 700, 800, 900, 1000)
+<pre class="r"><code>cluster_number = c(100, 200, 300, 480, 500, 700, 800, 1000)
 accuracies = rep(0, length(cluster_number))
 
 for (i in 1:length(cluster_number)){
-  km = hkmeans(AllTrainDF, cluster_number[i])
+  km = hkmeans(AllTrainDF, cluster_number[i]) 
   hist_train_data = featurize_data(TrainData, km$centers)
   hist_test_data = featurize_data(TestData, km$centers)
 
@@ -448,7 +448,7 @@ for (i in 1:length(cluster_number)){
 
 improve_result_1 = list(cluster_number = cluster_number, accuracies = accuracies)
 save(improve_result_1, file = &quot;improve_result_1.data&quot;)</code></pre>
-<p>This experiment shows cluster of <span class="math inline">\(300\)</span> improved the accuracy to:<span class="math inline">\(0.8092486\)</span>.</p>
+<p>This experiment shows cluster of <span class="math inline">\(300\)</span> improved the accuracy to:<span class="math inline">\(0.7976879\)</span>.</p>
 </div>
 <div id="modifying-the-size-of-the-fixed-length-samples" class="section level3">
 <h3>2.Modifying the size of the fixed length samples</h3>
@@ -478,12 +478,8 @@ for (i in 1:length(sample_size)){
 
 improve_result_2 = list(sample_size = sample_size, accuracies = accuracies)
 save(improve_result_2, file = &quot;improve_result_2.data&quot;)</code></pre>
-<p>This experiment shows sample size of <span class="math inline">\(40\)</span> improved the accuracy to:<span class="math inline">\(0.8092486\)</span>.</p>
-<p><strong>Note</strong>: both experiments don’t give us consistent results. But as rule of thumb,</p>
-<ul>
-<li>Higher number of cluster gives us better results.</li>
-<li>Smaller size of sample (8, 16, 24) usually give us better results than 32.</li>
-</ul>
+<p>This experiment shows sample size of <span class="math inline">\(16\)</span> improved the accuracy to:<span class="math inline">\(0.8034682\)</span>.</p>
+<p><strong>Note</strong>: both experiments don’t give us consistent results. But as rule of thumb, smaller size of sample (8, 16, 24) usually give us better results than 32.</p>
 </div>
 </div>
 </div>
