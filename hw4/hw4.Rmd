@@ -273,7 +273,7 @@ result[["CM"]]
 ### 1.Modifying the number of cluster centers in k-means
 
 ```{r, eval=!params$load_precomputed_data}
-cluster_number = c(300, 480, 500, 700, 800, 900, 1000)
+cluster_number = c(100, 200, 300, 480, 500, 700, 800, 1000)
 accuracies = rep(0, length(cluster_number))
 
 for (i in 1:length(cluster_number)){
