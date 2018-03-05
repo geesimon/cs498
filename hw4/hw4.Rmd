@@ -7,13 +7,13 @@ output:
     toc: yes
   pdf_document: default
 params:
-  load_precomputed_data: no
+  load_precomputed_data: yes
 ---
 
 
 #Problem 1
 
-You can find a dataset dealing with European employment in 1979 at http://lib.stat.cmu.edu/DASL/Stories/EuropeanJobs.html. This dataset gives the percentage of people employed in each of a set of areas in 1979 for each of a set of European countries. Notice this dataset contains only 26 data points.
+Find a dataset dealing with European employment in 1979 at http://lib.stat.cmu.edu/DASL/Stories/EuropeanJobs.html. This dataset gives the percentage of people employed in each of a set of areas in 1979 for each of a set of European countries. Notice this dataset contains only 26 data points.
 
 ##Part (1)
 Use an agglomerative clusterer to cluster this data. Produce a dendrogram of this data for each of single link, complete link, and group average clustering. 
@@ -35,7 +35,7 @@ plot(hclust(d, method = "single"), labels = Countries, main = "Single Link Clust
 plot(hclust(d, method = "complete"), labels = Countries, main = "Complete Link Clustering", xlab = "")
 ```
 
-- From some height, this clustering makes Turkey, Greece and Yugoslavia one cluster, Rumania, Czechoslovakia, USSR etc a second cluster and the rest counties a 3rd cluster If we check the history, countries in the second cluster are most socialism countries at that time (except Spain, Portugal and Ireland) and also close to each other. Countries in the 3rd cluster are  capitalism countries except East Germany which is closely grouped with West Germany (since they were one country). 
+- From some height, this clustering makes Turkey, Greece and Yugoslavia one cluster. Romania, Czechoslovakia, USSR etc a second cluster and the rest counties a 3rd cluster If we check the history, countries in the second cluster are most socialism countries at that time (except Spain, Portugal and Ireland) and also close to each other. Countries in the 3rd cluster are  capitalism countries except East Germany which is closely grouped with West Germany (since they were one country). 
 - Countries close to each other will more likely to be clustered together. For example: East Germany and West Germany. Netherlands, Norway, Denmark and Sweden. Belgium and United Kingdom.
 
 ```{r}
@@ -60,10 +60,9 @@ Notice there is a sharp drop in cost from k = 1 to k = 4. After that, the cost f
 #Problem 2
 Obtain the activities of daily life dataset from the UC Irvine machine learning
 website (https://archive.ics.uci.edu/ml/datasets/Dataset+for+ADL+Recognition+with+Wrist-worn+Accelerometer
-data provided by Barbara Bruno, Fulvio Mastrogiovanni and Antonio Sgor-
-bissa).
+data provided by Barbara Bruno, Fulvio Mastrogiovanni and Antonio Sgorbissa).
 
-Let's load all data and split them among training and test dataset.
+We will load all data and split them among training and test dataset.
 ```{r}
 ActivityLabels = c("Brush_teeth", "Climb_stairs", "Comb_hair", "Descend_stairs",
                    "Drink_glass", "Eat_meat", "Eat_soup", "Getup_bed", 
@@ -145,16 +144,15 @@ cut.listdf = function(ll_df, sample_length){
 }
 ```
 
-#Cut data to fix-size vector (32*3)
+Cut data to fix-size vector (32*3)
 ```{r}
 TrainData = cut.listdf(RawTrainData, 32)
 TestData = cut.listdf(RawTestData, 32)
 ```
 
-
 ##Part (a) - Build a classifier that classifies sequences into one of the 14 activities provided
 
-We build a dictionary by clustering the training data with $$k=480$$.
+We build a dictionary by clustering the training data with $k=480$.
 ```{r}
 #Merge all training data
 merge_list_df = function (ll_df) {
@@ -177,10 +175,11 @@ AllTrainDF = merge_list_df(TrainData)
 # }
 
 set.seed(1972)
-km = kmeans(AllTrainDF, centers = 480)
+library(factoextra)
+km = hkmeans(AllTrainDF, 480)
 ```
 
-We vector quantize training and test dataset and compute the histgram of these dataset to make features for later classification.
+We vector quantize training and test dataset and compute the histgram of these dataset to build features for later classification.
 ```{r}
 vector_quantize = function(df, centers){
   df = as.matrix(df)
@@ -219,7 +218,7 @@ HistTestData = featurize_data(TestData, km$centers)
 ```
 
 We then use random forest to train and calculate the accuracy of the test dataset. In the classifier, we try different depth of tree and number of trees to get the best model.
-```{r eval=!params$load_precomputed_data}
+```{r, eval=!params$load_precomputed_data}
 library(h2o)
 
 get_best_classifier = function(train_frame, test_frame, ntrees, max_depths) {
@@ -258,53 +257,50 @@ result = get_best_classifier(h2o_train_data, h2o_test_data, c(10, 20, 30), c(4, 
 result[["CM"]] = h2o.confusionMatrix(result$model)
 
 save(result, file="result.data")
-h2o.shutdown(prompt=FALSE)
 ```
 
 ```{r}
-#load("result.data")
-
-error_rate = 1 - result[["accuracy"]]
+load(file="result.data")
 ```
 
-We get the result as,
+We got the result as,
 
-- Error rate: 
-- Confusion Matrix:
-$`r result[["CM"]]`$
+- Error rate: $`r 1 - result[["accuracy"]]`$
+- Confusion Matrix: 
+```{r}
+result[["CM"]]
+```
 
 ##Part (b) - Improve classifier 
-### Modifying the number of cluster centers in k-means
+### 1.Modifying the number of cluster centers in k-means
 ```{r}
 cluster_number = c(100, 200, 300, 400, 500, 600, 700, 800, 900, 1000)
 sample_size = c(16, 24, 32, 40, 48, 56, 64)
-
-h2o.init(nthreads=-1, max_mem_size = "2G")
-h2o.removeAll()
 ```
 
-```{r}
+```{r, eval=!params$load_precomputed_data}
+accuracies = rep(0, length(cluster_number))
 for (i in 1:length(cluster_number)){
   km = kmeans(AllTrainDF, centers = cluster_number[i])
   hist_train_data = featurize_data(TrainData, km$centers)
   hist_test_data = featurize_data(TestData, km$centers)
-  
+
   hist_train_data$label = as.factor(ActivityLabels[hist_train_data$label])
   hist_test_data$label = as.factor(ActivityLabels[hist_test_data$label])
 
   h2o_train_data = as.h2o(hist_train_data)
   h2o_test_data = as.h2o(hist_test_data)
-  
-  result = get_best_classifier(h2o_train_data, h2o_test_data, c(20, 30), c(8, 16))
-  
-  print(result$accuracy)
-}
 
+  accuracies[i] = get_best_classifier(h2o_train_data, h2o_test_data, c(20, 30), 
+                                      c(8, 16))$accuracy
+
+  print(accuracies[i])
+}
 ```
 
-### Modifying the size of the fixed length samples to use
-
-```{r}
+### 2.Modifying the size of the fixed length samples
+```{r, eval=!params$load_precomputed_data}
+accuracies = rep(0, length(sample_size))
 for (i in 1:length(sample_size)){
   km = kmeans(AllTrainDF, centers = 480)
   train_data = cut.listdf(RawTrainData, sample_size[i])
@@ -317,14 +313,15 @@ for (i in 1:length(sample_size)){
 
   h2o_train_data = as.h2o(hist_train_data)
   h2o_test_data = as.h2o(hist_test_data)
-  
-  result = get_best_classifier(h2o_train_data, h2o_test_data, c(20, 30), c(8, 16))
-  
-  print(result$accuracy)
+
+  accuracies[i] = get_best_classifier(h2o_train_data, h2o_test_data, c(20, 30), c(8, 16))
+
+  print(accuracies[i])
 }
+
 ```
 
-```{r}
+```{r, eval=!params$load_precomputed_data}
 h2o.shutdown(prompt=FALSE)
 ```
 
