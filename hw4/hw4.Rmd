@@ -15,6 +15,10 @@ params:
 
 Find a dataset dealing with European employment in 1979 at http://lib.stat.cmu.edu/DASL/Stories/EuropeanJobs.html. This dataset gives the percentage of people employed in each of a set of areas in 1979 for each of a set of European countries. Notice this dataset contains only 26 data points.
 
+```{r, eval=!params$load_precomputed_data, echo=FALSE}
+start_time = Sys.time()
+```
+
 ##Part (1)
 Use an agglomerative clusterer to cluster this data. Produce a dendrogram of this data for each of single link, complete link, and group average clustering. 
 
@@ -273,13 +277,11 @@ result[["CM"]]
 
 ##Part (b) - Improve classifier 
 ### 1.Modifying the number of cluster centers in k-means
-```{r}
-cluster_number = c(100, 200, 300, 400, 500, 600, 700, 800, 900, 1000)
-sample_size = c(16, 24, 32, 40, 48, 56, 64)
-```
 
 ```{r, eval=!params$load_precomputed_data}
+cluster_number = c(300, 480, 500, 700, 800, 900, 1000)
 accuracies = rep(0, length(cluster_number))
+
 for (i in 1:length(cluster_number)){
   km = kmeans(AllTrainDF, centers = cluster_number[i])
   hist_train_data = featurize_data(TrainData, km$centers)
@@ -294,17 +296,30 @@ for (i in 1:length(cluster_number)){
   accuracies[i] = get_best_classifier(h2o_train_data, h2o_test_data, c(20, 30), 
                                       c(8, 16))$accuracy
 
-  print(accuracies[i])
+  cat(accuracies[i])
 }
+
+improve_result_1 = list(cluster_number = cluster_number, accuracies = accuracies)
+save(improve_result_1, file = "improve_result_1.data")
 ```
+
+```{r echo=FALSE}
+load("improve_result_1.data")
+```
+
+We see cluster of $`r improve_result_1[["cluster_number"]][which.max(improve_result_1[["accuracies"]])]`$ gives us the best accuracy $`r max(improve_result_1[["accuracies"]])`$.
 
 ### 2.Modifying the size of the fixed length samples
 ```{r, eval=!params$load_precomputed_data}
+sample_size = c(8, 16, 24, 32, 40, 48, 64)
 accuracies = rep(0, length(sample_size))
+
 for (i in 1:length(sample_size)){
-  km = kmeans(AllTrainDF, centers = 480)
   train_data = cut.listdf(RawTrainData, sample_size[i])
   test_data = cut.listdf(RawTestData, sample_size[i])
+  all_train_df = merge_list_df(train_data)
+  
+  km = hkmeans(all_train_df, 480)
   hist_train_data = featurize_data(train_data, km$centers)
   hist_test_data = featurize_data(test_data, km$centers)
 
@@ -314,14 +329,26 @@ for (i in 1:length(sample_size)){
   h2o_train_data = as.h2o(hist_train_data)
   h2o_test_data = as.h2o(hist_test_data)
 
-  accuracies[i] = get_best_classifier(h2o_train_data, h2o_test_data, c(20, 30), c(8, 16))
+  accuracies[i] = get_best_classifier(h2o_train_data, h2o_test_data, c(20, 30), 
+                                      c(8, 16))$accuracy
 
-  print(accuracies[i])
+  cat(accuracies[i])
 }
+
+improve_result_2 = list(sample_size = sample_size, accuracies = accuracies)
+save(improve_result_2, file = "improve_result_2.data")
 
 ```
 
-```{r, eval=!params$load_precomputed_data}
+```{r echo=FALSE}
+load("improve_result_2.data")
+```
+We see sample size of $`r improve_result_2[["sample_size"]][which.max(improve_result_2[["accuracies"]])]`$ gives us the best accuracy $`r max(improve_result_2[["accuracies"]])`$.
+
+```{r, eval=!params$load_precomputed_data, echo = FALSE}
 h2o.shutdown(prompt=FALSE)
 ```
 
+```{r, eval=!params$load_precomputed_data, echo=FALSE}
+cat(paste("\nTotal Execution Time:", difftime(Sys.time(), start_time)))
+```
