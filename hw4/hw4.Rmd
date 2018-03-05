@@ -152,29 +152,35 @@ TestData = cut.listdf(RawTestData, 32)
 ```
 
 
-##Part (a)
-Build a classifier that classifies sequences into one of the 14 activities provided. To make features, you should vector quantize, then use a histogram
-of cluster centers (as described in the subsection; this gives a pretty explicit set of steps to follow). You will find it helpful to use hierarchical
-k-means to vector quantize. You may use whatever multi-class classifier
-you wish, though I’d start with R’s decision forest, because it’s easy to
-use and effective. You should report (a) the total error rate and (b) the
-class confusion matrix of your classifier.
+##Part (a) - Build a classifier that classifies sequences into one of the 14 activities provided
 
 We build a dictionary by clustering the training data with $$k=480$$.
 ```{r}
 #Merge all training data
-all_data = data.frame()
-for (i in 1:length(TrainData)){
-  for (j in 1:length(TrainData[[i]])){
-    all_data = rbind(all_data, TrainData[[i]][[j]])
+merge_list_df = function (ll_df) {
+  all_df = data.frame()
+  for (i in 1:length(ll_df)){
+    for (j in 1:length(ll_df[[i]])){
+      all_df = rbind(all_df, ll_df[[i]][[j]])
+    }
   }
+  return (all_df)
 }
 
+AllTrainDF = merge_list_df(TrainData)
+
+# AllTrainDF = data.frame()
+# for (i in 1:length(TrainData)){
+#   for (j in 1:length(TrainData[[i]])){
+#     AllTrainDF = rbind(AllTrainDF, TrainData[[i]][[j]])
+#   }
+# }
+
 set.seed(1972)
-km = kmeans(all_data, centers = 480)
+km = kmeans(AllTrainDF, centers = 480)
 ```
 
-We vector quantize training and test dataset and compute the histgram of these dataset as features.
+We vector quantize training and test dataset and compute the histgram of these dataset to make features for later classification.
 ```{r}
 vector_quantize = function(df, centers){
   df = as.matrix(df)
@@ -212,10 +218,10 @@ HistTrainData = featurize_data(TrainData, km$centers)
 HistTestData = featurize_data(TestData, km$centers)
 ```
 
+We then use random forest to train and calculate the accuracy of the test dataset. In the classifier, we try different depth of tree and number of trees to get the best model.
 ```{r eval=!params$load_precomputed_data}
 library(h2o)
 
-set.seed(19720816)
 get_best_classifier = function(train_frame, test_frame, ntrees, max_depths) {
   accuracies = rep(0, length(ntrees) * length(max_depths))
   models = list()
@@ -223,8 +229,8 @@ get_best_classifier = function(train_frame, test_frame, ntrees, max_depths) {
   index = 1
   for (ntree in 1:length(ntrees)) {
     for (depth in 1:length(max_depths)) {
-      rf = h2o.randomForest(y = "label", training_frame = train_frame, ntrees = ntrees[ntree], 
-                            max_depth = max_depths[depth])
+      rf = h2o.randomForest(y = "label", training_frame = train_frame, 
+                            ntrees = ntrees[ntree], max_depth = max_depths[depth])
       prediction = h2o.predict(rf, newdata = test_frame[-dim(test_frame)[2]])
       
       models[[index]] = rf
@@ -261,18 +267,64 @@ h2o.shutdown(prompt=FALSE)
 error_rate = 1 - result[["accuracy"]]
 ```
 
-- Error rate: 
+We get the result as,
 
+- Error rate: 
 - Confusion Matrix:
 $`r result[["CM"]]`$
 
-##Part (b)
-Now see if you can improve your classifier by (a) modifying the number
-of cluster centers in your hierarchical k-means and (b) modifying the size
-of the fixed length samples that you use.
+##Part (b) - Improve classifier 
+### Modifying the number of cluster centers in k-means
+```{r}
+cluster_number = c(100, 200, 300, 400, 500, 600, 700, 800, 900, 1000)
+sample_size = c(16, 24, 32, 40, 48, 56, 64)
 
+h2o.init(nthreads=-1, max_mem_size = "2G")
+h2o.removeAll()
+```
 
 ```{r}
+for (i in 1:length(cluster_number)){
+  km = kmeans(AllTrainDF, centers = cluster_number[i])
+  hist_train_data = featurize_data(TrainData, km$centers)
+  hist_test_data = featurize_data(TestData, km$centers)
+  
+  hist_train_data$label = as.factor(ActivityLabels[hist_train_data$label])
+  hist_test_data$label = as.factor(ActivityLabels[hist_test_data$label])
 
+  h2o_train_data = as.h2o(hist_train_data)
+  h2o_test_data = as.h2o(hist_test_data)
+  
+  result = get_best_classifier(h2o_train_data, h2o_test_data, c(20, 30), c(8, 16))
+  
+  print(result$accuracy)
+}
+
+```
+
+### Modifying the size of the fixed length samples to use
+
+```{r}
+for (i in 1:length(sample_size)){
+  km = kmeans(AllTrainDF, centers = 480)
+  train_data = cut.listdf(RawTrainData, sample_size[i])
+  test_data = cut.listdf(RawTestData, sample_size[i])
+  hist_train_data = featurize_data(train_data, km$centers)
+  hist_test_data = featurize_data(test_data, km$centers)
+
+  hist_train_data$label = as.factor(ActivityLabels[hist_train_data$label])
+  hist_test_data$label = as.factor(ActivityLabels[hist_test_data$label])
+
+  h2o_train_data = as.h2o(hist_train_data)
+  h2o_test_data = as.h2o(hist_test_data)
+  
+  result = get_best_classifier(h2o_train_data, h2o_test_data, c(20, 30), c(8, 16))
+  
+  print(result$accuracy)
+}
+```
+
+```{r}
+h2o.shutdown(prompt=FALSE)
 ```
 
