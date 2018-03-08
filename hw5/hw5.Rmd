@@ -1,0 +1,13 @@
+---
+title: "Homework 1"
+author: "CS 498, Spring 2018, Xiaoming Ji"
+date: ''
+output:
+  html_document:
+    toc: yes
+  pdf_document: default
+params:
+  load_precomputed_data: yes
+---
+
+
