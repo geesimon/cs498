@@ -95,7 +95,7 @@ qqnorm(physical_df$Mass - model_b$fitted.values ^ 3, main = "Normal Q-Q Plot, mo
 qqline(physical_df$Mass - model_b$fitted.values ^ 3, col = "darkorange", lwd = 2)
 ```
 
-- Model (a) show better normality of errors. and thus is better than (b).
+- Model (a) show better normality of errors and thus is better than (b).
 
 #Problem 3
 At https://archive.ics.uci.edu/ml/datasets/Abalone, you will find a dataset of measurements by W. J. Nash, T. L. Sellers, S. R. Talbot, A. J. Cawthorn and W. B. Ford, made in 1992. These are a variety of measurements of blacklip abalone (Haliotis rubra; delicious by repute) of various ages and genders.
