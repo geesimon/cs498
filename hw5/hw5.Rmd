@@ -18,24 +18,25 @@ At http://www.statsci.org/data/general/brunhild.html, you will find a dataset th
 Prepare a plot showing (a) the data points and (b) the regression line in log-log coordinates.
 
 ```{r}
-brunhild = read.delim("brunhild.txt")
-model = lm(log(Sulfate) ~ log(Hours), data = brunhild)
-plot(log(brunhild$Hours), log(brunhild$Sulfate), xlab = "LOG(Hours)", ylab = "LOG()", col = "dodgerblue", pch = 20, cex = 1.5)
-abline(model, col = "darkorange", lwd = 2)
+brunhild_df = read.delim("brunhild.txt")
+model_a = lm(log(Sulfate) ~ log(Hours), data = brunhild_df)
+plot(log(brunhild_df$Hours), log(brunhild_df$Sulfate), xlab = "LOG(Hours)", ylab = "LOG()", col = "dodgerblue", pch = 20, cex = 1.5)
+abline(model_a, col = "darkorange", lwd = 2)
 ```
 
 ##(b) 
 Prepare a plot showing (a) the data points and (b) the regression curve in the original coordinates.
 ```{r}
-plot(brunhild, col = "dodgerblue", pch = 20, cex = 1.5)
-curve(exp(model$coefficients[1] + log(x) * model$coefficients[2]), from = min(brunhild$Hours), to = max(brunhild$Hours), add = TRUE, col = "darkorange", lwd = 2)
+plot(brunhild_df, col = "dodgerblue", pch = 20, cex = 1.5)
+curve(exp(model_a$coefficients[1] + log(x) * model_a$coefficients[2]), from = min(brunhild_df$Hours), to = max(brunhild_df$Hours), add = TRUE, col = "darkorange", lwd = 2)
 ```
 
 ##(c) 
 Plot the residual against the fitted values in log-log and in original coordinates.
 ```{r}
-fit_values = exp(model$coefficients[1] + log(brunhild$Hours) * model$coefficients[2])
-res_values = brunhild$Sulfate - fit_values
+fit_values = exp(model_a$coefficients[1] + log(brunhild_df$Hours) * 
+                   model_a$coefficients[2])
+res_values = brunhild_df$Sulfate - fit_values
 plot(fit_values, res_values, col = "dodgerblue",
 pch = 20, cex = 1.5, xlab = "Fitted values", ylab = "Residuals")
 abline(h = 0, lty = 2, col = "darkorange", lwd = 2)
@@ -44,24 +45,57 @@ abline(h = 0, lty = 2, col = "darkorange", lwd = 2)
 ##(d) 
 Use your plots to explain whether your regression is good or bad and why.
 
-Answer: If we just eye-exame  plot (a) and (b), it seems the model fits the data very well. However, good model also need to follow linearity and constant variance assumptions which is exposed by plot (c). 
+*Answer:* If we just eye-exame  plot (a) and (b), it seems the model fits the data very well. However, good model also need to follow linearity and constant variance assumptions which is exposed by plot (c). 
 
 - To check linearity assumptions, we need exam at any fitted value , the mean of the residuals should be roughly 0. This is not the case for most points in this plot.
 - To check constant variance assumption in this plot, we need exam at every fitted value, the spread of the residuals should be roughly the same. This is not the case in this plot and we see the magnitude of residuals increase when fitted value increase. 
 
-For these reasons, we believe this is a **bad** regression.
+For these reasons, we believe this is a **BAD** regression.
 
 #Problem 2
-At http://www.statsci.org/data/oz/physical.html, youwillfindadatasetofmea- surements by M. Larner, made in 1996. These measurements include body mass, and various diameters. Build a linear regression of predicting the body mass from these diameters.
+At http://www.statsci.org/data/oz/physical.html, you will find a dataset of measurements by M. Larner, made in 1996. These measurements include body mass, and various diameters. Build a linear regression of predicting the body mass from these diameters.
 
 ##(a) 
 Plot the residual against the fitted values for your regression.
 
+```{r}
+physical_df = read.delim("physical.txt")
+model_a = lm(Mass ~ ., data = physical_df)
+plot(model_a$fitted.values, model_a$residuals, col = "dodgerblue", 
+     pch = 20, cex = 1.5, xlab = "Fitted values of Mass", ylab = "Residuals")
+abline(h = 0, lty = 2, col = "darkorange", lwd = 2)
+```
+
 ##(b) 
 Now regress the cube root of mass against these diameters. Plot the residual against the fitted values in both these cube root coordinates and in the original coordinates.
 
+```{r}
+model_b = lm(Mass ^ (1/3) ~ ., data = physical_df)
+plot(model_b$fitted.values, model_b$residuals, col = "dodgerblue", 
+     pch = 20, cex = 1.5, xlab = expression(paste("Fitted Value of ",Mass^(1/3))), ylab = "Residuals")
+abline(h = 0, lty = 2, col = "darkorange", lwd = 2)
+```
+```{r}
+plot(model_b$fitted.values ^ 3, physical_df$Mass - model_b$fitted.values ^ 3 , 
+     col = "dodgerblue", pch = 20, cex = 1.5, xlab = "Fitted values of Mass", 
+     ylab = "Residuals")
+abline(h = 0, lty = 2, col = "darkorange", lwd = 2)
+```
+
 ##(c) 
 Use your plots to explain which regression is better.
+
+*Answer:* We don't see much different in these 2 plots in terms of linearity and variance. As a matter of fact, (a) has slightly smaller residual standard deviation (`r sd(model_a$residuals)` vs. `r sd(physical_df$Mass - model_b$fitted.values ^ 3)`). Since model (a) is simpler, model **(a)** is better.
+
+As another investigation, if we make Q-Q plots of these 2 regressions.
+```{r}
+qqnorm(model_a$residuals, main = "Normal Q-Q Plot, model (a)", col = "dodgerblue")
+qqline(model_a$residuals, col = "darkorange", lwd = 2)
+qqnorm(physical_df$Mass - model_b$fitted.values ^ 3, main = "Normal Q-Q Plot, model (b)", col = "dodgerblue")
+qqline(physical_df$Mass - model_b$fitted.values ^ 3, col = "darkorange", lwd = 2)
+```
+
+- Model (a) show better normality of errors. and thus is better than (b).
 
 #Problem 3
 At https://archive.ics.uci.edu/ml/datasets/Abalone, you will find a dataset of measurements by W. J. Nash, T. L. Sellers, S. R. Talbot, A. J. Cawthorn and W. B. Ford, made in 1992. These are a variety of measurements of blacklip abalone (Haliotis rubra; delicious by repute) of various ages and genders.
