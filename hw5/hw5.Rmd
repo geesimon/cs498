@@ -20,21 +20,36 @@ Prepare a plot showing (a) the data points and (b) the regression line in log-lo
 ```{r}
 brunhild = read.delim("brunhild.txt")
 model = lm(log(Sulfate) ~ log(Hours), data = brunhild)
-plot(log(brunhild$Hours), log(brunhild$Sulfate), xlab = "LOGHOURS", ylab = "LOGSULFATE")
-abline(model)
+plot(log(brunhild$Hours), log(brunhild$Sulfate), xlab = "LOG(Hours)", ylab = "LOG()", col = "dodgerblue", pch = 20, cex = 1.5)
+abline(model, col = "darkorange", lwd = 2)
 ```
 
 ##(b) 
 Prepare a plot showing (a) the data points and (b) the regression curve in the original coordinates.
 ```{r}
-plot(brunhild)
+plot(brunhild, col = "dodgerblue", pch = 20, cex = 1.5)
+curve(exp(model$coefficients[1] + log(x) * model$coefficients[2]), from = min(brunhild$Hours), to = max(brunhild$Hours), add = TRUE, col = "darkorange", lwd = 2)
 ```
 
 ##(c) 
 Plot the residual against the fitted values in log-log and in original coordinates.
+```{r}
+fit_values = exp(model$coefficients[1] + log(brunhild$Hours) * model$coefficients[2])
+res_values = brunhild$Sulfate - fit_values
+plot(fit_values, res_values, col = "dodgerblue",
+pch = 20, cex = 1.5, xlab = "Fitted values", ylab = "Residuals")
+abline(h = 0, lty = 2, col = "darkorange", lwd = 2)
+```
 
 ##(d) 
 Use your plots to explain whether your regression is good or bad and why.
+
+Answer: If we just eye-exame  plot (a) and (b), it seems the model fits the data very well. However, good model also need to follow linearity and constant variance assumptions which is exposed by plot (c). 
+
+- To check linearity assumptions, we need exam at any fitted value , the mean of the residuals should be roughly 0. This is not the case for most points in this plot.
+- To check constant variance assumption in this plot, we need exam at every fitted value, the spread of the residuals should be roughly the same. This is not the case in this plot and we see the magnitude of residuals increase when fitted value increase. 
+
+For these reasons, we believe this is a **bad** regression.
 
 #Problem 2
 At http://www.statsci.org/data/oz/physical.html, youwillfindadatasetofmea- surements by M. Larner, made in 1996. These measurements include body mass, and various diameters. Build a linear regression of predicting the body mass from these diameters.
