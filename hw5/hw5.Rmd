@@ -102,17 +102,59 @@ At https://archive.ics.uci.edu/ml/datasets/Abalone, you will find a dataset of m
 ##(a) 
 Build a linear regression predicting the age from the measurements, ignoring gender. Plot the residual against the fitted values.
 
+```{r}
+abalone_data = read.csv("abalone.data", header=FALSE)
+
+model_a = lm(V9 ~ V2 + V3 + V4 + V5 + V6 + V7 + V8, data = abalone_data)
+plot(model_a$fitted.values, model_a$residuals, col = "dodgerblue", 
+     pch = 20, cex = 1.5, xlab = "Fitted values of Age", ylab = "Residuals (without gender)")
+abline(h = 0, lty = 2, col = "darkorange", lwd = 2)
+```
+
 ##(b) 
 Build a linear regression predicting the age from the measurements, including gender. There are three levels for gender; I’m not sure whether this has to do with abalone biology or difficulty in determining gender. You can represent gender numerically by choosing 1 for one level, 0 for another, and -1 for the third. Plot the residual against the fitted values.
+
+```{r}
+abalone_data_1 = abalone_data
+#abalone_data_1$V1 = as.integer(abalone_data_1$V1)
+#abalone_data_1$V1[abalone_data_1$V1 == 3] = -1
+#abalone_data_1$V1[abalone_data_1$V1 == 2] = 0
+
+model_b = lm(V9 ~ ., data = abalone_data_1)
+plot(model_b$fitted.values, model_b$residuals, col = "dodgerblue", 
+     pch = 20, cex = 1.5, xlab = "Fitted values of Age", ylab = "Residuals")
+abline(h = 0, lty = 2, col = "darkorange", lwd = 2)
+```
+
+**Note**: we actually make gender a categorical variable and build the model.
 
 ##(c) 
 Now build a linear regression predicting the log of age from the measurements, ignoring gender. Plot the residual against the fitted values.
 
+```{r}
+model_c = lm(log(V9) ~ V2 + V3 + V4 + V5 + V6 + V7 + V8, data = abalone_data)
+plot(exp(model_c$fitted.values), abalone_data$V9 - exp(model_c$fitted.values), col = "dodgerblue", 
+     pch = 20, cex = 1.5, xlab = "Fitted values of Age", ylab = "Residuals (without gender)")
+abline(h = 0, lty = 2, col = "darkorange", lwd = 2)
+```
+
 ##(d) 
 Now build a linear regression predicting the log age from the measurements, including gender, represented as above. Plot the residual against the fitted values.
 
+```{r}
+model_d = lm(log(V9) ~ ., data = abalone_data_1)
+plot(exp(model_d$fitted.values), abalone_data_1$V9 - exp(model_d$fitted.values), col = "dodgerblue", 
+     pch = 20, cex = 1.5, xlab = "Fitted values of Age", ylab = "Residuals (without gender)")
+abline(h = 0, lty = 2, col = "darkorange", lwd = 2)
+```
+
 ##(e) 
-Itturnsoutthatdeterminingtheageofanabaloneispossible,butdifficult (you section the shell, and count rings). Use your plots to explain which regression you would use to replace this procedure, and why.
+It turns out that determining the age of anabalone is possible, but difficult (you section the shell, and count rings). Use your plots to explain which regression you would use to replace this procedure, and why.
+
+```{r}
+
+```
+
 
 ##(f) 
 Can you improve these regressions by using a regularizer? Use glmnet to obtain plots of the cross-validated prediction error.
