@@ -45,7 +45,7 @@ abline(h = 0, lty = 2, col = "darkorange", lwd = 2)
 ##(d) 
 Use your plots to explain whether your regression is good or bad and why.
 
-*Answer:* If we just eye-exame  plot (a) and (b), it seems the model fits the data very well. However, good model also need to follow linearity and constant variance assumptions which is exposed by plot (c). 
+*Answer:* If we just eye-exam  plot (a) and (b), it seems the model fits the data very well. However, good model also need to follow linearity and constant variance assumptions which is exposed by plot (c). 
 
 - To check linearity assumptions, we need exam at any fitted value , the mean of the residuals should be roughly 0. This is not the case for most points in this plot.
 - To check constant variance assumption in this plot, we need exam at every fitted value, the spread of the residuals should be roughly the same. This is not the case in this plot and we see the magnitude of residuals increase when fitted value increase. 
@@ -99,11 +99,16 @@ qqline(physical_df$Mass - model_b$fitted.values ^ 3, col = "darkorange", lwd = 2
 
 #Problem 3
 At https://archive.ics.uci.edu/ml/datasets/Abalone, you will find a dataset of measurements by W. J. Nash, T. L. Sellers, S. R. Talbot, A. J. Cawthorn and W. B. Ford, made in 1992. These are a variety of measurements of blacklip abalone (Haliotis rubra; delicious by repute) of various ages and genders.
+
 ##(a) 
 Build a linear regression predicting the age from the measurements, ignoring gender. Plot the residual against the fitted values.
 
 ```{r}
 abalone_data = read.csv("abalone.data", header=FALSE)
+abalone_data$V9 = abalone_data$V9 + 1.5
+abalone_data$V1 = as.integer(abalone_data$V1)
+abalone_data$V1[abalone_data$V1 == 3] = -1
+abalone_data$V1[abalone_data$V1 == 2] = 0
 
 model_a = lm(V9 ~ V2 + V3 + V4 + V5 + V6 + V7 + V8, data = abalone_data)
 plot(model_a$fitted.values, model_a$residuals, col = "dodgerblue", 
@@ -115,12 +120,7 @@ abline(h = 0, lty = 2, col = "darkorange", lwd = 2)
 Build a linear regression predicting the age from the measurements, including gender. There are three levels for gender; I’m not sure whether this has to do with abalone biology or difficulty in determining gender. You can represent gender numerically by choosing 1 for one level, 0 for another, and -1 for the third. Plot the residual against the fitted values.
 
 ```{r}
-abalone_data_1 = abalone_data
-#abalone_data_1$V1 = as.integer(abalone_data_1$V1)
-#abalone_data_1$V1[abalone_data_1$V1 == 3] = -1
-#abalone_data_1$V1[abalone_data_1$V1 == 2] = 0
-
-model_b = lm(V9 ~ ., data = abalone_data_1)
+model_b = lm(V9 ~ ., data = abalone_data)
 plot(model_b$fitted.values, model_b$residuals, col = "dodgerblue", 
      pch = 20, cex = 1.5, xlab = "Fitted values of Age", ylab = "Residuals")
 abline(h = 0, lty = 2, col = "darkorange", lwd = 2)
@@ -133,28 +133,55 @@ Now build a linear regression predicting the log of age from the measurements, i
 
 ```{r}
 model_c = lm(log(V9) ~ V2 + V3 + V4 + V5 + V6 + V7 + V8, data = abalone_data)
-plot(exp(model_c$fitted.values), abalone_data$V9 - exp(model_c$fitted.values), col = "dodgerblue", 
-     pch = 20, cex = 1.5, xlab = "Fitted values of Age", ylab = "Residuals (without gender)")
+plot(model_c$fitted.values, model_c$residuals, col = "dodgerblue", 
+     pch = 20, cex = 1.5, xlab = "Fitted values of Log(Age)", 
+     ylab = "Residuals (without gender)")
 abline(h = 0, lty = 2, col = "darkorange", lwd = 2)
+# plot(exp(model_c$fitted.values), abalone_data$V9 - exp(model_c$fitted.values), 
+#      col = "dodgerblue", pch = 20, cex = 1.5, xlab = "Fitted values of Age", 
+#      ylab = "Residuals (without gender)")
+# abline(h = 0, lty = 2, col = "darkorange", lwd = 2)
 ```
 
 ##(d) 
 Now build a linear regression predicting the log age from the measurements, including gender, represented as above. Plot the residual against the fitted values.
 
 ```{r}
-model_d = lm(log(V9) ~ ., data = abalone_data_1)
-plot(exp(model_d$fitted.values), abalone_data_1$V9 - exp(model_d$fitted.values), col = "dodgerblue", 
-     pch = 20, cex = 1.5, xlab = "Fitted values of Age", ylab = "Residuals (without gender)")
+model_d = lm(log(V9) ~ ., data = abalone_data)
+plot(model_d$fitted.values, model_d$residuals, col = "dodgerblue", 
+     pch = 20, cex = 1.5, xlab = "Fitted values of Log(Age)", ylab = "Residuals")
 abline(h = 0, lty = 2, col = "darkorange", lwd = 2)
+# plot(exp(model_d$fitted.values), abalone_data$V9 - exp(model_d$fitted.values), 
+#      col = "dodgerblue",pch = 20, cex = 1.5, xlab = "Fitted values of Age", 
+#      ylab = "Residuals")
+# abline(h = 0, lty = 2, col = "darkorange", lwd = 2)
 ```
 
 ##(e) 
-It turns out that determining the age of anabalone is possible, but difficult (you section the shell, and count rings). Use your plots to explain which regression you would use to replace this procedure, and why.
+It turns out that determining the age of an abalone is possible, but difficult (you section the shell, and count rings). Use your plots to explain which regression you would use to replace this procedure, and why.
 
-```{r}
-
-```
-
+**Abswer:** The plots of (c) and (d) do look follow linearity assumption better than (a) and (b). In addition, (c) and (d) don't seem have much difference, since (c) has fewer variables and simpler, we would choose **(c)** as the best regression model.  
 
 ##(f) 
 Can you improve these regressions by using a regularizer? Use glmnet to obtain plots of the cross-validated prediction error.
+
+We do glmnet and make plots for the above 4 models.
+```{r}
+library(glmnet)
+set.seed(19720816)
+
+x = as.matrix(abalone_data[,-9])
+y = abalone_data$V9
+
+model_a_1 = cv.glmnet(x[,-9], y)
+model_b_1 = cv.glmnet(x, y)
+model_c_1 = cv.glmnet(x[,-9], log(y))
+model_d_1 = cv.glmnet(x, log(y))
+
+plot(model_a_1)
+plot(model_b_1)
+plot(model_c_1)
+plot(model_d_1)
+```
+
+- The experiment shows that model (a) and (d) can be slightly improved by using a regularizer with $\lambda$ of `r model_a_1$lambda.min` and `r model_b_1$lambda.min` respectively.
