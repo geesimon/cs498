@@ -118,7 +118,7 @@ abalone_data$V1[abalone_data$V1 == 2] = 0
 model_a = lm(V9 ~ V2 + V3 + V4 + V5 + V6 + V7 + V8, data = abalone_data)
 plot(model_a$fitted.values, model_a$residuals, col = "dodgerblue", 
      pch = 20, cex = 1.5, xlab = "Fitted values of Age", 
-     ylab = "Residuals (without gender)")
+     ylab = "Residuals (without gender)", ylim = c(-15, 15))
 abline(h = 0, lty = 2, col = "darkorange", lwd = 2)
 ```
 
@@ -128,7 +128,8 @@ Build a linear regression predicting the age from the measurements, including ge
 ```{r}
 model_b = lm(V9 ~ ., data = abalone_data)
 plot(model_b$fitted.values, model_b$residuals, col = "dodgerblue", 
-     pch = 20, cex = 1.5, xlab = "Fitted values of Age", ylab = "Residuals")
+     pch = 20, cex = 1.5, xlab = "Fitted values of Age", ylab = "Residuals",
+     ylim = c(-15, 15))
 abline(h = 0, lty = 2, col = "darkorange", lwd = 2)
 ```
 
@@ -137,14 +138,14 @@ Now build a linear regression predicting the log of age from the measurements, i
 
 ```{r}
 model_c = lm(log(V9) ~ V2 + V3 + V4 + V5 + V6 + V7 + V8, data = abalone_data)
-plot(model_c$fitted.values, model_c$residuals, col = "dodgerblue", 
-     pch = 20, cex = 1.5, xlab = "Fitted values of Log(Age)", 
-     ylab = "Residuals (without gender)")
-abline(h = 0, lty = 2, col = "darkorange", lwd = 2)
-# plot(exp(model_c$fitted.values), abalone_data$V9 - exp(model_c$fitted.values), 
-#      col = "dodgerblue", pch = 20, cex = 1.5, xlab = "Fitted values of Age", 
+# plot(model_c$fitted.values, model_c$residuals, col = "dodgerblue", 
+#      pch = 20, cex = 1.5, xlab = "Fitted values of Log(Age)", 
 #      ylab = "Residuals (without gender)")
 # abline(h = 0, lty = 2, col = "darkorange", lwd = 2)
+plot(exp(model_c$fitted.values), abalone_data$V9 - exp(model_c$fitted.values),
+     col = "dodgerblue", pch = 20, cex = 1.5, xlab = "Fitted values of Age",
+     ylab = "Residuals (without gender)", ylim = c(-15, 15))
+abline(h = 0, lty = 2, col = "darkorange", lwd = 2)
 ```
 
 ##(d) 
@@ -152,24 +153,24 @@ Now build a linear regression predicting the log age from the measurements, incl
 
 ```{r}
 model_d = lm(log(V9) ~ ., data = abalone_data)
-plot(model_d$fitted.values, model_d$residuals, col = "dodgerblue", 
-     pch = 20, cex = 1.5, xlab = "Fitted values of Log(Age)", ylab = "Residuals")
-abline(h = 0, lty = 2, col = "darkorange", lwd = 2)
-# plot(exp(model_d$fitted.values), abalone_data$V9 - exp(model_d$fitted.values), 
-#      col = "dodgerblue",pch = 20, cex = 1.5, xlab = "Fitted values of Age", 
-#      ylab = "Residuals")
+# plot(model_d$fitted.values, model_d$residuals, col = "dodgerblue", 
+#      pch = 20, cex = 1.5, xlab = "Fitted values of Log(Age)", ylab = "Residuals")
 # abline(h = 0, lty = 2, col = "darkorange", lwd = 2)
+plot(exp(model_d$fitted.values), abalone_data$V9 - exp(model_d$fitted.values),
+     col = "dodgerblue",pch = 20, cex = 1.5, xlab = "Fitted values of Age",
+     ylab = "Residuals", ylim = c(-15, 15))
+abline(h = 0, lty = 2, col = "darkorange", lwd = 2)
 ```
 
 ##(e) 
 It turns out that determining the age of an abalone is possible, but difficult (you section the shell, and count rings). Use your plots to explain which regression you would use to replace this procedure, and why.
 
-**Abswer:** The plots of (c) and (d) do look follow linearity assumption better than (a) and (b). (c) and (d) don't seem have much difference, since (c) has less variables and simpler, we would choose **(c)** as the best regression model.  
+**Abswer:** Its very hard to tell linearity difference among these plots. However, we do see model (a) and (b) has 2 wrong fitted values (one is close to 0 and the other is less than 0). Since model (c) is simpler than model (d), we would choose model (c) as the best model among these 4 models.
 
 ##(f) 
 Can you improve these regressions by using a regularizer? Use glmnet to obtain plots of the cross-validated prediction error.
 
-We do glmnet and make plots for the above 4 models.
+We do cv.glmnet and make plots for the above 4 models.
 ```{r message=FALSE, warning=FALSE}
 library(glmnet)
 set.seed(19720816)
@@ -188,4 +189,13 @@ plot(model_c_1)
 plot(model_d_1)
 ```
 
-- The experiment shows that model (a) and (d) can be slightly improved by using a regularizer with very small $\lambda$ of `r model_a_1$lambda.min` and `r model_b_1$lambda.min` respectively.
+To test whether the regularizer improves regression, we will do cross-validation and compare cvm (mean cross-validated error) between lambda 0 (the original model) and the one we get from previous lambda with minimum cvm. Output of none-zero means the regularizer is better than the original model. 
+
+```{r}
+set.seed(19720816)
+cv.glmnet(x[,-9], y, lambda = c(0, model_a_1$lambda.min))$lambda.min
+cv.glmnet(x, y, lambda = c(0, model_b_1$lambda.min))$lambda.min
+cv.glmnet(x[,-9], log(y), lambda = c(0, model_c_1$lambda.min))$lambda.min
+cv.glmnet(x, log(y), lambda = c(0, model_d_1$lambda.min))$lambda.min
+```
+Randomly, we do see the regularizer improves regression. 
