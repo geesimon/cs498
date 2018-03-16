@@ -10,13 +10,64 @@ output:
 
 
 #Problem 1
-Linear regression with various regularizers The UCI Machine Learning dataset repository hosts a dataset giving features of music, and the latitude and longitude from which that music originates here. Investigate methods to predict latitude and longitude from these features, as below. There are actually two versions of this dataset. Either one is OK by me, but I think you'll find the one with more independent variables more interesting. You should ignore outliers (by this I mean you should ignore the whole question; do not try to deal with them). You should regard latitude and longitude as entirely independent.
+Linear regression with various regularizers The UCI Machine Learning dataset repository hosts a dataset giving features of music, and the latitude and longitude from which that music originates here. Investigate methods to predict latitude and longitude from these features, as below. **There are actually two versions of this dataset. Either one is OK by me, we will use the one with more independent variables . We will ignore outliers. We also regard latitude and longitude as entirely independent.
+
+```{r, message=FALSE, warning=FALSE}
+library(readr)
+
+COL_NUM = 118
+
+ALL_DF = read_csv("./Geographical Original of Music/default_plus_chromatic_features_1059_tracks.txt", 
+                  col_names = sapply(1:COL_NUM, FUN =function(x) {paste("F", x, sep = "")}))
+colnames(ALL_DF)[COL_NUM - 1] = "Lat"
+colnames(ALL_DF)[COL_NUM] = "Long"
+
+Lat_DF = ALL_DF[, -COL_NUM]
+Long_DF = ALL_DF[, -(COL_NUM - 1)]
+```
+
+## 1.1
 First, build a straightforward linear regression of latitude (resp. longitude) against features. What is the R-squared? Plot a graph evaluating each regression.
+
+```{r}
+lat_model = lm(Lat ~ ., data = Lat_DF)
+long_model = lm(Long ~ ., data = Long_DF)
+```
+
+We get R-squred for each model as,
+
+- Latitude: $`r summary(lat_model)$r.squared`$
+- Longitude: $`r summary(long_model)$r.squared`$
+
+Plots of Residual vs Fitted Values as,
+
+- Latitude:
+```{r, echo=FALSE}
+plot(lat_model$fitted.values, lat_model$residuals, col = "dodgerblue",
+pch = 20, cex = 1.5, xlab = "Latitude Fitted values", ylab = "Latitude Residuals")
+abline(h = 0, lty = 2, col = "darkorange", lwd = 2)
+```
+- Longitude:
+```{r, echo=FALSE}
+plot(long_model$fitted.values, long_model$residuals, col = "dodgerblue",
+pch = 20, cex = 1.5, xlab = "Longitude Fitted values", ylab = "Longitude Residuals")
+abline(h = 0, lty = 2, col = "darkorange", lwd = 2)
+```
+
+## 1.2
 Does a Box-Cox transformation improve the regressions? Notice that the dependent variable has some negative values, which Box-Cox doesn't like. You can deal with this by remembering that these are angles, so you get to choose the origin. why do you say so? For the rest of the exercise, use the transformation if it does improve things, otherwise, use the raw data.
+
+```{r}
+
+```
+
+
+## 1.3
 Use glmnet to produce:
-A regression regularized by L2 (equivalently, a ridge regression). You should estimate the regularization coefficient that produces the minimum error. Is the regularized regression better than the unregularized regression?
-A regression regularized by L1 (equivalently, a lasso regression). You should estimate the regularization coefficient that produces the minimum error. How many variables are used by this regression? Is the regularized regression better than the unregularized regression?
-A regression regularized by elastic net (equivalently, a regression regularized by a convex combination of L1 and L2). Try three values of alpha, the weight setting how big L1 and L2 are. You should estimate the regularization coefficient that produces the minimum error. How many variables are used by this regression? Is the regularized regression better than the unregularized regression?
+
+- A regression regularized by L2 (equivalently, a ridge regression). You should estimate the regularization coefficient that produces the minimum error. Is the regularized regression better than the unregularized regression?
+- A regression regularized by L1 (equivalently, a lasso regression). You should estimate the regularization coefficient that produces the minimum error. How many variables are used by this regression? Is the regularized regression better than the unregularized regression?
+- A regression regularized by elastic net (equivalently, a regression regularized by a convex combination of L1 and L2). Try three values of alpha, the weight setting how big L1 and L2 are. You should estimate the regularization coefficient that produces the minimum error. How many variables are used by this regression? Is the regularized regression better than the unregularized regression?
 
 
 #Problem 2
