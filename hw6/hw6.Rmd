@@ -111,7 +111,6 @@ Above info shows Box-Cox Latitude regression model has better R Squared (12.7% g
 - Box-Cox transformation gives better Latitude regression model. 
 - We will not use any transformation for Longitude model.
 
-
 ## 1.3
 Use glmnet to produce:
 
