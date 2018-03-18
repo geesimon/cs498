@@ -22,6 +22,10 @@ ALL_DF = read_csv("./Geographical Original of Music/default_plus_chromatic_featu
 colnames(ALL_DF)[COL_NUM - 1] = "Lat"
 colnames(ALL_DF)[COL_NUM] = "Long"
 
+#Change origin in order to eliminate negative value
+ALL_DF$Lat = 180 + ALL_DF$Lat
+ALL_DF$Long =  180 + ALL_DF$Long
+
 Lat_DF = ALL_DF[, -COL_NUM]
 Long_DF = ALL_DF[, -(COL_NUM - 1)]
 ```
@@ -43,23 +47,69 @@ Plots of Residual vs Fitted Values as,
 
 - Latitude:
 ```{r, echo=FALSE}
-plot(lat_model$fitted.values, lat_model$residuals, col = "dodgerblue",
-pch = 20, cex = 1.5, xlab = "Latitude Fitted values", ylab = "Latitude Residuals")
-abline(h = 0, lty = 2, col = "darkorange", lwd = 2)
+plot_residule = function (values, residuals, xtitle, ytitle){
+  plot(values, residuals, col = "dodgerblue",
+  pch = 20, cex = 1.5, xlab = xtitle, ylab = ytitle)
+  abline(h = 0, lty = 2, col = "darkorange", lwd = 2)
+}
+
+plot_residule(lat_model$fitted.values, lat_model$residuals, 
+              "Latitude Fitted values", "Latitude Residuals")
 ```
 - Longitude:
 ```{r, echo=FALSE}
-plot(long_model$fitted.values, long_model$residuals, col = "dodgerblue",
-pch = 20, cex = 1.5, xlab = "Longitude Fitted values", ylab = "Longitude Residuals")
-abline(h = 0, lty = 2, col = "darkorange", lwd = 2)
+plot_residule(long_model$fitted.values, long_model$residuals, 
+              "Longitude Fitted values", "Longitude Residuals")
 ```
 
 ## 1.2
-Does a Box-Cox transformation improve the regressions? Notice that the dependent variable has some negative values, which Box-Cox doesn't like. You can deal with this by remembering that these are angles, so you get to choose the origin. why do you say so? For the rest of the exercise, use the transformation if it does improve things, otherwise, use the raw data.
+Does a Box-Cox transformation improve the regressions? 
+
+We make boxcox plot to determine $\lambda$.
+```{r}
+library(MASS)
+par(mfrow=c(1, 2))
+boxcox(lat_model, lambda = seq(1, 12, 0.1), plotit = TRUE)
+boxcox(long_model, lambda = seq(0, 2, 0.1), plotit = TRUE)
+```
+
+From the above plots, we see the best $\lambda$,
+
+- Latitude: 6
+- Longitude: 1, which means no need to do transformation.
+
+We evaluate whether Box-Cox transformation for $\lambda=6$ can give us better Latitude regression model.
+
+We firstly make Residual vs Fitted Values plot.
 
 ```{r}
+boxcox_lat_model = lm((Lat ^ 6 - 1) / 6 ~ ., data = Lat_DF)
 
+v = (6 * boxcox_lat_model$fitted.values + 1) ^ (1/6)
+r = Lat_DF$Lat - v
+
+plot_residule(v, r, "Box-Cox Latitude Fitted values", 
+              "Box-Cox Latitude Fitted values")
 ```
+
+This plot dosen't seem to have much different with the regular one. We then check the R Squared, R Adujusted Squared and RMSE value of both models.
+
+```{r}
+regular_rmse = sqrt(mean(resid(lat_model) ^ 2))
+boxcox_rmse = sqrt(mean(r ^ 2))
+```
+
+|Model|R.Squared|R.Adujusted.Squared|RMSE|
+|-----|---------|------------------|-----|
+|Regular|$`r summary(lat_model)["r.squared"]`$|$`r summary(lat_model)["adj.r.squared"]`$|$`r regular_rmse`$|
+|Box-Cox|$`r summary(boxcox_lat_model)["r.squared"]`$|$`r summary(boxcox_lat_model)["adj.r.squared"]`$|$`r boxcox_rmse`$|
+
+Above info shows Box-Cox Latitude regression model has better R Squared (12.7% gain) and R Adujusted Squared (16.6% gain) value than the regular one. Although it has a bigger RMSE, the increasement is relatively small (3.6% bigger). Thus, we believe the Box-Cox model is better.
+
+**To conclude:**
+
+- Box-Cox transformation gives better Latitude regression model. 
+- We will not use any transformation for Longitude model.
 
 
 ## 1.3
