@@ -10,15 +10,16 @@ output:
 
 
 #Problem 1
-Linear regression with various regularizers The UCI Machine Learning dataset repository hosts a dataset giving features of music, and the latitude and longitude from which that music originates here. Investigate methods to predict latitude and longitude from these features, as below. **There are actually two versions of this dataset. Either one is OK by me, we will use the one with more independent variables . We will ignore outliers. We also regard latitude and longitude as entirely independent.
+Linear regression with various regularizers The UCI Machine Learning dataset repository hosts a dataset giving features of music, and the latitude and longitude from which that music originates here. Investigate methods to predict latitude and longitude from these features, as below. There are actually two versions of this dataset. We will use the one with more independent variables. We will ignore outliers. We also regard latitude and longitude as entirely independent.
 
 ```{r, message=FALSE, warning=FALSE}
 library(readr)
 
-COL_NUM = 118
-
 ALL_DF = read_csv("./Geographical Original of Music/default_plus_chromatic_features_1059_tracks.txt", 
-                  col_names = sapply(1:COL_NUM, FUN =function(x) {paste("F", x, sep = "")}))
+                  col_names = FALSE)
+COL_NUM = dim(ALL_DF)[2]
+colnames(ALL_DF)[1:(COL_NUM - 2)] = sapply(1:(COL_NUM - 2), FUN = 
+                                             function(x) {paste("F", x, sep = "")})
 colnames(ALL_DF)[COL_NUM - 1] = "Lat"
 colnames(ALL_DF)[COL_NUM] = "Long"
 
@@ -38,7 +39,7 @@ lat_model = lm(Lat ~ ., data = Lat_DF)
 long_model = lm(Long ~ ., data = Long_DF)
 ```
 
-We get R-squred for each model as,
+We get R-squared for each model as,
 
 - Latitude: $`r summary(lat_model)$r.squared`$
 - Longitude: $`r summary(long_model)$r.squared`$
@@ -65,7 +66,7 @@ plot_residule(long_model$fitted.values, long_model$residuals,
 ## 1.2
 Does a Box-Cox transformation improve the regressions? 
 
-We make boxcox plot to determine $\lambda$.
+We make Box-Cox plot to determine $\lambda$.
 ```{r}
 library(MASS)
 par(mfrow=c(1, 2))
@@ -83,7 +84,11 @@ We evaluate whether Box-Cox transformation for $\lambda=6$ can give us better La
 We firstly make Residual vs Fitted Values plot.
 
 ```{r}
-boxcox_lat_model = lm((Lat ^ 6 - 1) / 6 ~ ., data = Lat_DF)
+#We make another dataframe and do the transform on the data. 
+#This is to benefit the later regularization comparison
+BoxCox_Lat_DF = Lat_DF
+BoxCox_Lat_DF$Lat = (BoxCox_Lat_DF$Lat ^ 6 - 1) / 6
+boxcox_lat_model = lm(Lat ~ ., data = BoxCox_Lat_DF)
 
 v = (6 * boxcox_lat_model$fitted.values + 1) ^ (1/6)
 r = Lat_DF$Lat - v
@@ -92,19 +97,19 @@ plot_residule(v, r, "Box-Cox Latitude Fitted values",
               "Box-Cox Latitude Fitted values")
 ```
 
-This plot dosen't seem to have much different with the regular one. We then check the R Squared, R Adujusted Squared and RMSE value of both models.
+This plot doesn't seem to have much different with the regular one. We then check the R Squared, R Adjusted Squared and RMSE value of both models.
 
 ```{r}
 regular_rmse = sqrt(mean(resid(lat_model) ^ 2))
 boxcox_rmse = sqrt(mean(r ^ 2))
 ```
 
-|Model|R.Squared|R.Adujusted.Squared|RMSE|
+|Model|R.Squared|R.Adjusted.Squared|RMSE|
 |-----|---------|------------------|-----|
 |Regular|$`r summary(lat_model)["r.squared"]`$|$`r summary(lat_model)["adj.r.squared"]`$|$`r regular_rmse`$|
 |Box-Cox|$`r summary(boxcox_lat_model)["r.squared"]`$|$`r summary(boxcox_lat_model)["adj.r.squared"]`$|$`r boxcox_rmse`$|
 
-Above info shows Box-Cox Latitude regression model has better R Squared (12.7% gain) and R Adujusted Squared (16.6% gain) value than the regular one. Although it has a bigger RMSE, the increasement is relatively small (3.6% bigger). Thus, we believe the Box-Cox model is better.
+Above info shows Box-Cox Latitude regression model has better R Squared (12.7% gain) and R Adjusted Squared (16.6% gain) value than the regular one. Although it has a bigger RMSE, the incremental is relatively small (3.6% bigger). Thus, we believe the Box-Cox model is better.
 
 **To conclude:**
 
@@ -114,10 +119,184 @@ Above info shows Box-Cox Latitude regression model has better R Squared (12.7% g
 ## 1.3
 Use glmnet to produce:
 
-- A regression regularized by L2 (equivalently, a ridge regression). You should estimate the regularization coefficient that produces the minimum error. Is the regularized regression better than the unregularized regression?
-- A regression regularized by L1 (equivalently, a lasso regression). You should estimate the regularization coefficient that produces the minimum error. How many variables are used by this regression? Is the regularized regression better than the unregularized regression?
-- A regression regularized by elastic net (equivalently, a regression regularized by a convex combination of L1 and L2). Try three values of alpha, the weight setting how big L1 and L2 are. You should estimate the regularization coefficient that produces the minimum error. How many variables are used by this regression? Is the regularized regression better than the unregularized regression?
+### 1.3.1
+A regression regularized by L2 (equivalently, a ridge regression). We will estimate the regularization coefficient that produces the minimum error. Is the regularized regression better than the unregularized regression?
 
+```{r, message=FALSE, warning=FALSE}
+library(glmnet)
+
+#Compare the regularized model with the unregularized one
+compare_model = function(df, alpha, family = "gaussian") {
+  col_num = dim(df)[2]
+  x = as.matrix(df[, -col_num])
+  y = as.matrix(df[,col_num])
+  
+  reg_model = cv.glmnet(x, y, alpha = alpha, family = family)
+  reg_lambda = reg_model$lambda.min
+  
+  com_model = cv.glmnet(x, y, alpha = alpha, lambda = c(reg_lambda, 0),
+                        family = family)
+  
+  return (list(reg_model = reg_model, 
+               best_lambda = com_model$lambda.min, 
+               cvm = com_model$cvm))
+}
+
+lat_result = compare_model(BoxCox_Lat_DF, 0)
+long_result = compare_model(Long_DF, 0)
+```
+```{r, echo=FALSE}
+par(mfrow=c(1, 2))
+plot(lat_result$reg_model)
+plot(long_result$reg_model)
+```
+
+
+|Model|Error (Regularized)|Error (UnRegularized)|Best $\lambda$|
+|-----|-----------------------|-------------------------|-------------|
+|Latitude|$`r lat_result[["cvm"]][1]`$|$`r lat_result[["cvm"]][2]`$|$`r lat_result[["best_lambda"]]`$|
+|Longitude|$`r long_result[["cvm"]][1]`$|$`r long_result[["cvm"]][2]`$|$`r long_result[["best_lambda"]]`$|
+
+- From the comparison above, we see both Latitude and Longitude regularized L2 models have smaller cross-validation error (MSE) than the unregulized ones. Thus are better.
+
+### 1.3.2
+A regression regularized by L1 (equivalently, a lasso regression). We will estimate the regularization coefficient that produces the minimum error. How many variables are used by this regression? Is the regularized regression better than the unregularized regression?
+
+```{r}
+lat_result = compare_model(BoxCox_Lat_DF, 1)
+long_result = compare_model(Long_DF, 1)
+
+lat_para_num = lat_result$reg_model$glmnet.fit$df[which.min(lat_result$reg_model$cvm)]
+long_para_num = long_result$reg_model$glmnet.fit$df[which.min(long_result$reg_model$cvm)]
+```
+
+```{r, echo=FALSE}
+par(mfrow=c(1, 2))
+plot(lat_result$reg_model)
+plot(long_result$reg_model)
+```
+
+
+- See table below to find the number of variables used by each regression.
+
+|Model|Error (Regularized)|Error (UnRegularized)|Best $\lambda$|# of Variables|
+|-----|-----------------------|-------------------------|-------------|------|
+|Latitude|$`r lat_result[["cvm"]][1]`$|$`r lat_result[["cvm"]][2]`$|$`r lat_result[["best_lambda"]]`$|$`r lat_para_num`$|
+|Longitude|$`r long_result[["cvm"]][1]`$|$`r long_result[["cvm"]][2]`$|$`r long_result[["best_lambda"]]`$|$`r long_para_num`$|
+
+- From the comparison above, we see both Latitude and Longitude regularized L1 models have smaller cross-validation error (MSE) than the unregulized ones. Thus are better.
+
+### 1.3.3
+A regression regularized by elastic net (equivalently, a regression regularized by a convex combination of L1 and L2). Try three values of alpha, the weight setting how big L1 and L2 are. We will estimate the regularization coefficient that produces the minimum error. How many variables are used by this regression? Is the regularized regression better than the unregularized regression?
+
+```{r}
+lat_result_25 = compare_model(BoxCox_Lat_DF, 0.25)
+lat_para_num_25 = lat_result_25$reg_model$glmnet.fit$df[which.min(lat_result_25$reg_model$cvm)]
+long_result_25 = compare_model(Long_DF, 0.25)
+long_para_num_25 = long_result_25$reg_model$glmnet.fit$df[which.min(long_result_25$reg_model$cvm)]
+
+lat_result_50 = compare_model(BoxCox_Lat_DF, 0.5)
+lat_para_num_50 = lat_result_50$reg_model$glmnet.fit$df[which.min(lat_result_50$reg_model$cvm)]
+long_result_50 = compare_model(Long_DF, 0.5)
+long_para_num_50 = long_result_50$reg_model$glmnet.fit$df[which.min(long_result_50$reg_model$cvm)]
+
+lat_result_75 = compare_model(BoxCox_Lat_DF, 0.75)
+lat_para_num_75 = lat_result_75$reg_model$glmnet.fit$df[which.min(lat_result_75$reg_model$cvm)]
+long_result_75 = compare_model(Long_DF, 0.75)
+long_para_num_75 = long_result_75$reg_model$glmnet.fit$df[which.min(long_result_75$reg_model$cvm)]
+
+```
+
+```{r, echo=FALSE}
+par(mfrow=c(2, 3))
+plot(lat_result_25$reg_model)
+legend("top", legend = expression(paste("Lat ",alpha,"=0.25")))
+plot(lat_result_50$reg_model)
+legend("top", legend = expression(paste("Lat ", alpha,"=0.5")))
+plot(lat_result_75$reg_model)
+legend("top", legend = expression(paste("Lat ", alpha,"=0.75")))
+plot(long_result_25$reg_model)
+legend("top", legend = expression(paste("Long ", alpha,"=0.25")))
+plot(long_result_50$reg_model)
+legend("top", legend = expression("Long ", paste(alpha,"=0.5")))
+plot(long_result_75$reg_model)
+legend("top", legend = expression("Long ", paste(alpha,"=0.75")))
+```
+
+
+- See table below to find the number of variables used by each regression.
+
+|Model|Error (Regularized)|Error (UnRegularized)|Best $\lambda$|# of Variables|
+|-----|-----------------------|-------------------------|-------------|------|
+|Latitude ($\alpha$=0.25)|$`r lat_result_25[["cvm"]][1]`$|$`r lat_result_25[["cvm"]][2]`$|$`r lat_result_25[["best_lambda"]]`$|$`r lat_para_num_25`$|
+|Latitude ($\alpha$=0.5)|$`r lat_result_50[["cvm"]][1]`$|$`r lat_result_50[["cvm"]][2]`$|$`r lat_result_50[["best_lambda"]]`$|$`r lat_para_num_50`$|
+|Latitude ($\alpha$=0.75)|$`r lat_result_75[["cvm"]][1]`$|$`r lat_result_75[["cvm"]][2]`$|$`r lat_result_75[["best_lambda"]]`$|$`r lat_para_num_75`$|
+|Longitude ($\alpha$=0.25)|$`r long_result_25[["cvm"]][1]`$|$`r long_result_25[["cvm"]][2]`$|$`r long_result_25[["best_lambda"]]`$|$`r long_para_num_25`$|
+|Longitude ($\alpha$=0.5)|$`r long_result_50[["cvm"]][1]`$|$`r long_result_50[["cvm"]][2]`$|$`r long_result_50[["best_lambda"]]`$|$`r long_para_num_50`$|
+|Longitude ($\alpha$=0.75)|$`r long_result_75[["cvm"]][1]`$|$`r long_result_75[["cvm"]][2]`$|$`r long_result_75[["best_lambda"]]`$|$`r long_para_num_75`$|
+
+- From the comparison above, we see all Latitude and Longitude regularized L1 models have smaller cross-validation error (MSE) than the unregulized ones. Thus are better.
 
 #Problem 2
-Logistic regression The UCI Machine Learning dataset repository hosts a dataset giving whether a Taiwanese credit card user defaults against a variety of features here. Use logistic regression to predict whether the user defaults. You should ignore outliers, but you should try the various regularization schemes we have discussed.
+Logistic regression. The UCI Machine Learning dataset repository hosts a dataset giving whether a Taiwanese credit card user defaults against a variety of features here. Use logistic regression to predict whether the user defaults. We will ignore outliers, but try the various regularization schemes we have discussed.
+
+```{r, message=FALSE, warning=FALSE}
+set.seed(20180318)
+CreditDF = read_csv("credit.csv", col_names = FALSE)
+CreditDF = CreditDF[, -1] #Remove the ID column
+# CreditDF$X3 = as.factor(CreditDF$X3)
+# CreditDF$X4 = as.factor(CreditDF$X4)
+# CreditDF$X5 = as.factor(CreditDF$X5)
+RecordNum = dim(CreditDF)[1]
+ColumnNum = dim(CreditDF)[2]
+
+#Make 80%-20% training-test data split
+TrainIndex = sample(1:RecordNum, RecordNum * 0.8)
+TestIndex = (1:RecordNum)[-TrainIndex]
+TrainCreditDF = CreditDF[TrainIndex,]
+TestCreditDF = CreditDF[TestIndex,]
+
+TrainCreditX = as.matrix(TrainCreditDF[,1:(dim(TrainCreditDF)[2] - 1)])
+TrainCreditY = as.matrix(TrainCreditDF[,dim(TrainCreditDF)[2]])
+
+best_alpha_bi_model = function(TrainDF, TestDF, alphas) {
+  col_num = dim(TrainDF)[2]
+  train_x = as.matrix(TrainDF[, -col_num])
+  train_y = as.matrix(TrainDF[,col_num])
+  test_x = as.matrix(TestDF[,-col_num])
+  test_y = as.matrix(TestDF[,col_num])
+  num_test = length(test_y)
+  
+  models = list()
+  accuracies = rep(0, length(alphas))
+  
+  for (i in 1:length(alphas)) {
+    models[[i]] = cv.glmnet(train_x, train_y, family="binomial", alpha = alphas[i])
+    accuracies[i] = sum((predict(models[[i]], newx = test_x, s = "lambda.min", 
+                                 type = "response") > 0.5) == test_y) / num_test
+    
+    print(accuracies[i])
+  }
+  
+  best_index = which.max(accuracies)
+
+  return (list(accuracy = accuracies[best_index], alpha = alphas[best_index],
+              model = models[[best_index]]))
+}
+```
+
+We try different alpha and choose the alpha that gives us the best accuracy. 
+```{r}
+best = best_alpha_bi_model(TrainCreditDF, TestCreditDF, c(0, 0.25, 0.5, 0.75, 1))
+best$accuracy
+best$alpha
+```
+
+We also make a unregularized model and calculate its accuracy.
+```{r}
+model = glm(X25 ~ ., family = "binomial", data = TestCreditDF)
+sum((predict(model, TestCreditDF[,-ColumnNum], type = "response") > 0.5) 
+    == TestCreditDF[,ColumnNum]) / dim(TestCreditDF)[1]
+```
+
+We can see the best regularized model is slightly better than the unregularized one if measured by accuracy.
