@@ -226,6 +226,8 @@ legend("top", legend = expression("Long ", paste(alpha,"=0.75")))
 
 - See table below to find the number of variables used by each regression.
 
+To do: change to original coordinates
+
 |Model|Error (Regularized)|Error (UnRegularized)|Best $\lambda$|# of Variables|
 |-----|-----------------------|-------------------------|-------------|------|
 |Latitude ($\alpha$=0.25)|$`r lat_result_25[["cvm"]][1]`$|$`r lat_result_25[["cvm"]][2]`$|$`r lat_result_25[["best_lambda"]]`$|$`r lat_para_num_25`$|
@@ -242,6 +244,9 @@ Logistic regression. The UCI Machine Learning dataset repository hosts a dataset
 
 ```{r, message=FALSE, warning=FALSE}
 set.seed(20180318)
+library(readxl)
+CreditDF = read_excel("default of credit card clients.xls", skip = 1)
+
 CreditDF = read_csv("credit.csv", col_names = FALSE)
 CreditDF = CreditDF[, -1] #Remove the ID column
 # CreditDF$X3 = as.factor(CreditDF$X3)
@@ -258,45 +263,64 @@ TestCreditDF = CreditDF[TestIndex,]
 
 TrainCreditX = as.matrix(TrainCreditDF[,1:(dim(TrainCreditDF)[2] - 1)])
 TrainCreditY = as.matrix(TrainCreditDF[,dim(TrainCreditDF)[2]])
+```
 
-best_alpha_bi_model = function(TrainDF, TestDF, alphas) {
-  col_num = dim(TrainDF)[2]
-  train_x = as.matrix(TrainDF[, -col_num])
-  train_y = as.matrix(TrainDF[,col_num])
-  test_x = as.matrix(TestDF[,-col_num])
-  test_y = as.matrix(TestDF[,col_num])
-  num_test = length(test_y)
-  
-  models = list()
-  accuracies = rep(0, length(alphas))
-  
-  for (i in 1:length(alphas)) {
-    models[[i]] = cv.glmnet(train_x, train_y, family="binomial", alpha = alphas[i])
-    accuracies[i] = sum((predict(models[[i]], newx = test_x, s = "lambda.min", 
-                                 type = "response") > 0.5) == test_y) / num_test
-    
-    print(accuracies[i])
-  }
-  
-  best_index = which.max(accuracies)
+We try different alpha and do default 10-fold cross-validation, choose the alpha that gives us the best accuracy against training data. 
+```{r}
+# best = best_alpha_bi_model(TrainCreditDF, TestCreditDF, c(0, 0.25, 0.5, 0.75, 1))
+# best$accuracy
+# best$alpha
 
-  return (list(accuracy = accuracies[best_index], alpha = alphas[best_index],
-              model = models[[best_index]]))
+# best = best_model(TrainCreditDF, TestCreditDF, c(0, 0.25, 0.5, 0.75, 1))
+# best$accuracy
+# best$alpha
+
+Alphas = c(0, 0.25, 0.5, 0.75, 1)
+
+col_num = dim(TrainCreditDF)[2]
+train_x = as.matrix(TrainCreditDF[, -col_num])
+train_y = as.matrix(TrainCreditDF[,col_num])
+test_x = as.matrix(TestCreditDF[,-col_num])
+test_y = as.matrix(TestCreditDF[,col_num])
+num_test = length(test_y)
+  
+models = list()
+accuracies = rep(0, length(Alphas))
+test_accuracies = rep(0, length(Alphas))
+  
+for (i in 1:length(Alphas)) {
+  models[[i]] = cv.glmnet(train_x, train_y, family="binomial", 
+                          alpha = Alphas[i], type.measure = "class")
+  
+  accuracies[i] = 1 - min(models[[i]]$cvm)
+  test_accuracies[i] = sum((predict(models[[i]], newx = test_x, s = "lambda.min", 
+                               type = "response") > 0.5) == test_y) / num_test
+  
+  
+  print(accuracies[i])
 }
+
+par(mfrow=c(2, 3))
+for (i in 1:length(Alphas)) {
+  plot(models[[i]])
+  legend("top", legend = paste("alpha=", Alphas[i], sep = ""))
+}
+
+best_index = which.max(accuracies)
+Alphas[best_index]
+accuracies[best_index]
 ```
 
-We try different alpha and choose the alpha that gives us the best accuracy. 
+We also make a unregularized model and calculate its accuracy against training data.
 ```{r}
-best = best_alpha_bi_model(TrainCreditDF, TestCreditDF, c(0, 0.25, 0.5, 0.75, 1))
-best$accuracy
-best$alpha
-```
+# model = glm(X25 ~ ., family = "binomial", data = TestCreditDF)
+# sum((predict(model, TestCreditDF[,-ColumnNum], type = "response") > 0.5) 
+#     == TestCreditDF[,ColumnNum]) / dim(TestCreditDF)[1]
 
-We also make a unregularized model and calculate its accuracy.
-```{r}
-model = glm(X25 ~ ., family = "binomial", data = TestCreditDF)
-sum((predict(model, TestCreditDF[,-ColumnNum], type = "response") > 0.5) 
-    == TestCreditDF[,ColumnNum]) / dim(TestCreditDF)[1]
+m = cv.glmnet(train_x, train_y, family="binomial", 
+          lambda = c(models[[best_index]]$lambda.min, 0), 
+          alpha = Alphas[best_index], type.measure = "class")
+1 - m$cvm
 ```
 
 We can see the best regularized model is slightly better than the unregularized one if measured by accuracy.
