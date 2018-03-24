@@ -3,9 +3,9 @@ title: "Homework 6"
 author: "CS 498, Spring 2018, Xiaoming Ji"
 date: ''
 output:
+  pdf_document: default
   html_document:
     toc: yes
-  pdf_document: default
 ---
 
 
@@ -63,6 +63,8 @@ plot_residule(long_model$fitted.values, long_model$residuals,
               "Longitude Fitted values", "Longitude Residuals")
 ```
 
+From these plots, we see the residuals are quite large and the residual of Longitude model is even larger. They also don't follow the linearity very well.
+
 ## 1.2
 Does a Box-Cox transformation improve the regressions? 
 
@@ -114,13 +116,15 @@ Above info shows Box-Cox Latitude regression model has better R Squared (12.7% g
 **To conclude:**
 
 - Box-Cox transformation gives better Latitude regression model. 
-- We will not use any transformation for Longitude model.
+- No need to do any transformation for Longitude model.
 
 ## 1.3
 Use glmnet to produce:
 
 ### 1.3.1
 A regression regularized by L2 (equivalently, a ridge regression). We will estimate the regularization coefficient that produces the minimum error. Is the regularized regression better than the unregularized regression?
+
+We do cross-validation to compare the regularized and unregularized models.
 
 ```{r, message=FALSE, warning=FALSE}
 library(glmnet)
@@ -158,6 +162,8 @@ plot(long_result$reg_model)
 |Longitude|$`r long_result[["cvm"]][1]`$|$`r long_result[["cvm"]][2]`$|$`r long_result[["best_lambda"]]`$|
 
 - From the comparison above, we see both Latitude and Longitude regularized L2 models have smaller cross-validation error (MSE) than the unregulized ones. Thus are better.
+
+**Note**: Since we only need to draw conclusion of which model is better, we don't need to change the MSE to the original coordinates.
 
 ### 1.3.2
 A regression regularized by L1 (equivalently, a lasso regression). We will estimate the regularization coefficient that produces the minimum error. How many variables are used by this regression? Is the regularized regression better than the unregularized regression?
@@ -226,8 +232,6 @@ legend("top", legend = expression("Long ", paste(alpha,"=0.75")))
 
 - See table below to find the number of variables used by each regression.
 
-To do: change to original coordinates
-
 |Model|Error (Regularized)|Error (UnRegularized)|Best $\lambda$|# of Variables|
 |-----|-----------------------|-------------------------|-------------|------|
 |Latitude ($\alpha$=0.25)|$`r lat_result_25[["cvm"]][1]`$|$`r lat_result_25[["cvm"]][2]`$|$`r lat_result_25[["best_lambda"]]`$|$`r lat_para_num_25`$|
@@ -243,15 +247,12 @@ To do: change to original coordinates
 Logistic regression. The UCI Machine Learning dataset repository hosts a dataset giving whether a Taiwanese credit card user defaults against a variety of features here. Use logistic regression to predict whether the user defaults. We will ignore outliers, but try the various regularization schemes we have discussed.
 
 ```{r, message=FALSE, warning=FALSE}
-set.seed(20180318)
+set.seed(19720816)
 library(readxl)
+library(glmnet)
 CreditDF = read_excel("default of credit card clients.xls", skip = 1)
 
-CreditDF = read_csv("credit.csv", col_names = FALSE)
 CreditDF = CreditDF[, -1] #Remove the ID column
-# CreditDF$X3 = as.factor(CreditDF$X3)
-# CreditDF$X4 = as.factor(CreditDF$X4)
-# CreditDF$X5 = as.factor(CreditDF$X5)
 RecordNum = dim(CreditDF)[1]
 ColumnNum = dim(CreditDF)[2]
 
@@ -265,16 +266,8 @@ TrainCreditX = as.matrix(TrainCreditDF[,1:(dim(TrainCreditDF)[2] - 1)])
 TrainCreditY = as.matrix(TrainCreditDF[,dim(TrainCreditDF)[2]])
 ```
 
-We try different alpha and do default 10-fold cross-validation, choose the alpha that gives us the best accuracy against training data. 
+- We try different alpha and do the default 10-fold cross-validation.
 ```{r}
-# best = best_alpha_bi_model(TrainCreditDF, TestCreditDF, c(0, 0.25, 0.5, 0.75, 1))
-# best$accuracy
-# best$alpha
-
-# best = best_model(TrainCreditDF, TestCreditDF, c(0, 0.25, 0.5, 0.75, 1))
-# best$accuracy
-# best$alpha
-
 Alphas = c(0, 0.25, 0.5, 0.75, 1)
 
 col_num = dim(TrainCreditDF)[2]
@@ -293,10 +286,7 @@ for (i in 1:length(Alphas)) {
                           alpha = Alphas[i], type.measure = "class")
   
   accuracies[i] = 1 - min(models[[i]]$cvm)
-  test_accuracies[i] = sum((predict(models[[i]], newx = test_x, s = "lambda.min", 
-                               type = "response") > 0.5) == test_y) / num_test
-  
-  
+
   print(accuracies[i])
 }
 
@@ -305,22 +295,27 @@ for (i in 1:length(Alphas)) {
   plot(models[[i]])
   legend("top", legend = paste("alpha=", Alphas[i], sep = ""))
 }
+```
 
+- We choose the alpha that gives us the best accuracy. 
+```{r}
 best_index = which.max(accuracies)
 Alphas[best_index]
 accuracies[best_index]
 ```
 
-We also make a unregularized model and calculate its accuracy against training data.
+- We evaluate the best regularized model against the test data and calculate the accuracy.
 ```{r}
-# model = glm(X25 ~ ., family = "binomial", data = TestCreditDF)
-# sum((predict(model, TestCreditDF[,-ColumnNum], type = "response") > 0.5) 
-#     == TestCreditDF[,ColumnNum]) / dim(TestCreditDF)[1]
+sum(predict(models[[best_index]], newx = test_x, s = "lambda.min", type = "class") == test_y) / num_test
+```
 
+Finally, we make a unregularized model and do cross-validation against the best regularized model.
+```{r}
 m = cv.glmnet(train_x, train_y, family="binomial", 
           lambda = c(models[[best_index]]$lambda.min, 0), 
           alpha = Alphas[best_index], type.measure = "class")
 1 - m$cvm
 ```
 
-We can see the best regularized model is slightly better than the unregularized one if measured by accuracy.
+- Interesting enough, the unregularized model has slightly better cross-validation accuracy than the best regularized mode.
+
