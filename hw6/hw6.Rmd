@@ -46,7 +46,6 @@ We get R-squared for each model as,
 
 Plots of Residual vs Fitted Values as,
 
-- Latitude:
 ```{r, echo=FALSE}
 plot_residule = function (values, residuals, xtitle, ytitle){
   plot(values, residuals, col = "dodgerblue",
@@ -57,7 +56,7 @@ plot_residule = function (values, residuals, xtitle, ytitle){
 plot_residule(lat_model$fitted.values, lat_model$residuals, 
               "Latitude Fitted values", "Latitude Residuals")
 ```
-- Longitude:
+
 ```{r, echo=FALSE}
 plot_residule(long_model$fitted.values, long_model$residuals, 
               "Longitude Fitted values", "Longitude Residuals")
@@ -142,7 +141,6 @@ compare_model = function(df, alpha, family = "gaussian") {
                         family = family)
   
   return (list(reg_model = reg_model, 
-               best_lambda = com_model$lambda.min, 
                cvm = com_model$cvm))
 }
 
@@ -151,17 +149,24 @@ long_result = compare_model(Long_DF, 0)
 ```
 ```{r, echo=FALSE}
 par(mfrow=c(1, 2))
-plot(lat_result$reg_model)
-plot(long_result$reg_model)
+plot(lat_result$reg_model, ylab = "MSE (Latitude)")
+plot(long_result$reg_model, ylab = "MSE (Longitude)")
 ```
 
 
-|Model|Error (Regularized)|Error (UnRegularized)|Best $\lambda$|
-|-----|-----------------------|-------------------------|-------------|
-|Latitude|$`r lat_result[["cvm"]][1]`$|$`r lat_result[["cvm"]][2]`$|$`r lat_result[["best_lambda"]]`$|
-|Longitude|$`r long_result[["cvm"]][1]`$|$`r long_result[["cvm"]][2]`$|$`r long_result[["best_lambda"]]`$|
+|Model|Error (Regularized)|Error (UnRegularized)|
+|-----|-----------------------|-------------------------|
+|Latitude|$`r lat_result[["cvm"]][1]`$|$`r lat_result[["cvm"]][2]`$|$`r lat_result[["reg_model"]]$lambda.min`$|$`r lat_result[["reg_model"]]$lambda.1se`$|
+|Longitude|$`r long_result[["cvm"]][1]`$|$`r long_result[["cvm"]][2]`$|$`r long_result[["reg_model"]]$lambda.min`$|$`r long_result[["reg_model"]]$lambda.1se`$|
 
 - From the comparison above, we see both Latitude and Longitude regularized L2 models have smaller cross-validation error (MSE) than the unregulized ones. Thus are better.
+
+Lets also check the $\lambda$:
+
+|Model|lambda.min|lambda.1se|
+|-----|----------|----------|
+|Latitude|$`r lat_result[["reg_model"]]$lambda.min`$|$`r lat_result[["reg_model"]]$lambda.1se`$|
+|Longitude|$`r long_result[["reg_model"]]$lambda.min`$|$`r long_result[["reg_model"]]$lambda.1se`$|
 
 **Note**: Since we only need to draw conclusion of which model is better, we don't need to change the MSE to the original coordinates.
 
@@ -178,19 +183,27 @@ long_para_num = long_result$reg_model$glmnet.fit$df[which.min(long_result$reg_mo
 
 ```{r, echo=FALSE}
 par(mfrow=c(1, 2))
-plot(lat_result$reg_model)
-plot(long_result$reg_model)
+plot(lat_result$reg_model, ylab = "MSE (Latitude)")
+plot(long_result$reg_model, ylab = "MSE (Longitude)")
 ```
-
 
 - See table below to find the number of variables used by each regression.
 
-|Model|Error (Regularized)|Error (UnRegularized)|Best $\lambda$|# of Variables|
-|-----|-----------------------|-------------------------|-------------|------|
-|Latitude|$`r lat_result[["cvm"]][1]`$|$`r lat_result[["cvm"]][2]`$|$`r lat_result[["best_lambda"]]`$|$`r lat_para_num`$|
-|Longitude|$`r long_result[["cvm"]][1]`$|$`r long_result[["cvm"]][2]`$|$`r long_result[["best_lambda"]]`$|$`r long_para_num`$|
+|Model|Error (Regularized)|Error (UnRegularized)|# of Regularized Variables|
+|-----|-----------------------|-------------------------|-------------|----|------|
+|Latitude|$`r lat_result[["cvm"]][1]`$|$`r lat_result[["cvm"]][2]`$|$`r lat_para_num`$|
+|Longitude|$`r long_result[["cvm"]][1]`$|$`r long_result[["cvm"]][2]`$|$`r long_para_num`$|
 
 - From the comparison above, we see both Latitude and Longitude regularized L1 models have smaller cross-validation error (MSE) than the unregulized ones. Thus are better.
+
+Lets also check the $\lambda$:
+
+|Model|lambda.min|lambda.1se|
+|-----|----------|----------|
+|Latitude|$`r lat_result[["reg_model"]]$lambda.min`$|$`r lat_result[["reg_model"]]$lambda.1se`$|
+|Longitude|$`r long_result[["reg_model"]]$lambda.min`$|$`r long_result[["reg_model"]]$lambda.1se`$|
+
+**Note**: The # of parameters for unregularized models are always the # of columns: 116.
 
 ### 1.3.3
 A regression regularized by elastic net (equivalently, a regression regularized by a convex combination of L1 and L2). Try three values of alpha, the weight setting how big L1 and L2 are. We will estimate the regularization coefficient that produces the minimum error. How many variables are used by this regression? Is the regularized regression better than the unregularized regression?
@@ -232,16 +245,27 @@ legend("top", legend = expression("Long ", paste(alpha,"=0.75")))
 
 - See table below to find the number of variables used by each regression.
 
-|Model|Error (Regularized)|Error (UnRegularized)|Best $\lambda$|# of Variables|
-|-----|-----------------------|-------------------------|-------------|------|
-|Latitude ($\alpha$=0.25)|$`r lat_result_25[["cvm"]][1]`$|$`r lat_result_25[["cvm"]][2]`$|$`r lat_result_25[["best_lambda"]]`$|$`r lat_para_num_25`$|
-|Latitude ($\alpha$=0.5)|$`r lat_result_50[["cvm"]][1]`$|$`r lat_result_50[["cvm"]][2]`$|$`r lat_result_50[["best_lambda"]]`$|$`r lat_para_num_50`$|
-|Latitude ($\alpha$=0.75)|$`r lat_result_75[["cvm"]][1]`$|$`r lat_result_75[["cvm"]][2]`$|$`r lat_result_75[["best_lambda"]]`$|$`r lat_para_num_75`$|
-|Longitude ($\alpha$=0.25)|$`r long_result_25[["cvm"]][1]`$|$`r long_result_25[["cvm"]][2]`$|$`r long_result_25[["best_lambda"]]`$|$`r long_para_num_25`$|
-|Longitude ($\alpha$=0.5)|$`r long_result_50[["cvm"]][1]`$|$`r long_result_50[["cvm"]][2]`$|$`r long_result_50[["best_lambda"]]`$|$`r long_para_num_50`$|
-|Longitude ($\alpha$=0.75)|$`r long_result_75[["cvm"]][1]`$|$`r long_result_75[["cvm"]][2]`$|$`r long_result_75[["best_lambda"]]`$|$`r long_para_num_75`$|
+|Model|Error (Regularized)|Error (UnRegularized)|# of Regularized Variables|
+|-----|-------------------|---------------------|--------------------------|
+|Latitude ($\alpha$=0.25)|$`r lat_result_25[["cvm"]][1]`$|$`r lat_result_25[["cvm"]][2]`$|$`r lat_para_num_25`$|
+|Latitude ($\alpha$=0.5)|$`r lat_result_50[["cvm"]][1]`$|$`r lat_result_50[["cvm"]][2]`$|$`r lat_para_num_50`$|
+|Latitude ($\alpha$=0.75)|$`r lat_result_75[["cvm"]][1]`$|$`r lat_result_75[["cvm"]][2]`$|$`r lat_para_num_75`$|
+|Longitude ($\alpha$=0.25)|$`r long_result_25[["cvm"]][1]`$|$`r long_result_25[["cvm"]][2]`$|$`r long_para_num_25`$|
+|Longitude ($\alpha$=0.5)|$`r long_result_50[["cvm"]][1]`$|$`r long_result_50[["cvm"]][2]`$|$`r long_para_num_50`$|
+|Longitude ($\alpha$=0.75)|$`r long_result_75[["cvm"]][1]`$|$`r long_result_75[["cvm"]][2]`$|$`r long_para_num_75`$|
 
 - From the comparison above, we see all Latitude and Longitude regularized L1 models have smaller cross-validation error (MSE) than the unregulized ones. Thus are better.
+
+Lets also check the $\lambda$:
+
+|Model|lambda.min|lambda.1se|
+|-----|----------|----------|
+|Latitude ($\alpha$=0.25)|$`r lat_result_25[["reg_model"]]$lambda.min`$|$`r lat_result_25[["reg_model"]]$lambda.1se`$|
+|Latitude ($\alpha$=0.5)|$`r lat_result_50[["reg_model"]]$lambda.min`$|$`r lat_result_50[["reg_model"]]$lambda.1se`$|
+|Latitude ($\alpha$=0.75)|$`r lat_result_75[["reg_model"]]$lambda.min`$|$`r lat_result_75[["reg_model"]]$lambda.1se`$|
+|Longitude ($\alpha$=0.25)|$`r long_result_25[["reg_model"]]$lambda.min`$|$`r long_result_25[["reg_model"]]$lambda.1se`$|
+|Longitude ($\alpha$=0.5)|$`r long_result_50[["reg_model"]]$lambda.min`$|$`r long_result_50[["reg_model"]]$lambda.1se`$|
+|Longitude ($\alpha$=0.75)|$`r long_result_75[["reg_model"]]$lambda.min`$|$`r long_result_75[["reg_model"]]$lambda.1se`$|
 
 #Problem 2
 Logistic regression. The UCI Machine Learning dataset repository hosts a dataset giving whether a Taiwanese credit card user defaults against a variety of features here. Use logistic regression to predict whether the user defaults. We will ignore outliers, but try the various regularization schemes we have discussed.
@@ -287,7 +311,10 @@ for (i in 1:length(Alphas)) {
   
   accuracies[i] = 1 - min(models[[i]]$cvm)
 
-  print(accuracies[i])
+  print(paste("Acccuracy :", format(accuracies[i],nsmall = 3),
+              "; lamda.min :", format(models[[i]]$lambda.min, nsmall = 3),
+              "; # of Variables :",
+              models[[i]]$glmnet.fit$df[which.min(models[[i]]$cvm)]))
 }
 
 par(mfrow=c(2, 3))
