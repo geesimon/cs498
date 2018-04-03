@@ -28,10 +28,12 @@ for (i in 1:(dim(df)[1])){
 - Cluster this to 30 topics, using a simple mixture of multinomial topic model, as lectured in class.
 
 ```{r}
-
+k = kmeans(DocVectors, 30)
 ```
 
 - Produce a graph showing, for each topic, the probability with which the topic is selected.
+
+
 - Produce a table showing, for each topic, the 10 words with the highest probability for that topic.
 
 #Problem 2
