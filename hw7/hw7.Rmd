@@ -12,7 +12,25 @@ output:
 #Problem 1
 **EM Topic models** The UCI Machine Learning dataset repository hosts several datasets recording word counts for documents here. You will use the NIPS dataset. You will find (a) a table of word counts per document and (b) a vocabulary list for this dataset at the link. You must implement the multinomial mixture of topics model, lectured in class. For this problem, you should write the clustering code yourself (i.e. not use a package for clustering).
 
+```{r}
+#Load data
+header = readLines("docword.nips.txt", n = 2)
+DocCount = as.integer(header[1])
+CocabSize = as.integer(header[2])
+df = read.table("docword.nips.txt", skip=3)
+
+DocVectors = matrix(0, DocCount, CocabSize)
+for (i in 1:(dim(df)[1])){
+  DocVectors[df[i, 1],df[i, 2]] = df[i, 3]
+}
+```
+
 - Cluster this to 30 topics, using a simple mixture of multinomial topic model, as lectured in class.
+
+```{r}
+
+```
+
 - Produce a graph showing, for each topic, the probability with which the topic is selected.
 - Produce a table showing, for each topic, the 10 words with the highest probability for that topic.
 
