@@ -27,8 +27,14 @@ for (i in 1:(dim(df)[1])){
 
 - Cluster this to 30 topics, using a simple mixture of multinomial topic model, as lectured in class.
 
+$x_{i,k}$
+
 ```{r}
+library(matrixStats)
+
 k = kmeans(DocVectors, 30)
+
+#Calculate initial values P and Pi
 ```
 
 - Produce a graph showing, for each topic, the probability with which the topic is selected.
