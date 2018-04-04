@@ -27,14 +27,66 @@ for (i in 1:(dim(df)[1])){
 
 - Cluster this to 30 topics, using a simple mixture of multinomial topic model, as lectured in class.
 
-$x_{i,k}$
 
 ```{r}
-library(matrixStats)
+#Initialize P and Pi
+TopicCount = 30
 
-k = kmeans(DocVectors, 30)
+P  = matrix(0, TopicCount, CocabSize)
+pi = rep(0, TopicCount)
+W  = matrix(0, DocCount, TopicCount)
 
-#Calculate initial values P and Pi
+#k = kmeans(DocVectors, 30)
+
+#Randomly sample docs
+iDocs = sample(1:DocCount, DocCount)
+
+bat_size = round(DocCount / TopicCount)
+s = 1
+e = bat_size
+
+for (j in 1:TopicCount) {
+  if (e > DocCount) e = DocCount
+  
+  iBatch = iDocs[s:e]
+  
+  #count words and add smoothing
+  words = colSums(DocVectors[iBatch,]) + 1e-2
+  
+  #Calculate P and Pi
+  P[j,]  = words / sum(words)
+  pi[j] = length(iBatch) / DocCount
+  
+  s = e + 1
+  e = e + bat_size
+}
+
+Log_P = log(P)
+Log_pi = log(pi)
+```
+
+$$
+\omega_{i,j}=\frac{\left[\prod_{k} p_{j,k}^{x_{i,k}}\right]\pi_j}{ \Sigma_l\left[\prod_{k} p_{j,k}^{x_{i,k}}\right]\pi_l}
+$$
+We transform this equation to logsumexp form to benefit calculation
+$$
+\log(\omega_{i,j})=\Sigma_{k}(\log p_{j,k}^{x_{i,k}}) + \log\pi_j - LogSumExp_l(\Sigma_{l,k} (\log p_{l,k}^{x_{i,k}}) + \log\pi_{l})
+$$
+
+```{r}
+Q = 0
+Log_W = W
+
+#Calculate new Q
+
+#E Step
+for (i in 1:DocCount) {
+  for (j in 1:TopicCount) {
+    W[i,j] = sum(Log_P[j,] * DocVectors[i,]) + Log_pi[j]
+  }
+}
+#M Step
+
 ```
 
 - Produce a graph showing, for each topic, the probability with which the topic is selected.
