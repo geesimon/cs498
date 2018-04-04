@@ -66,11 +66,11 @@ Log_pi = log(pi)
 ```
 
 $$
-\omega_{i,j}=\frac{\left[\prod_{k} p_{j,k}^{x_{i,k}}\right]\pi_j}{ \Sigma_l\left[\prod_{k} p_{j,k}^{x_{i,k}}\right]\pi_l}
+\omega_{i,j}=\frac{\left[\prod_{k} p_{j,k}^{x_{i,k}}\right]\pi_j}{ \sum_{l} \left[\prod_{k} p_{j,k}^{x_{i,k}}\right]\pi_l}
 $$
 We transform this equation to logsumexp form to benefit calculation
 $$
-\log(\omega_{i,j})=\Sigma_{k}(\log p_{j,k}^{x_{i,k}}) + \log\pi_j - LogSumExp_l(\Sigma_{l,k} (\log p_{l,k}^{x_{i,k}}) + \log\pi_{l})
+\log(\omega_{i,j})=\sum_{k}(\log p_{j,k}^{x_{i,k}}) + \log\pi_j - LogSumExp_l(\sum_{l,k} (\log p_{j,k}^{x_{i,k}}) + \log\pi_{l})
 $$
 
 ```{r}
@@ -90,7 +90,6 @@ for (i in 1:DocCount) {
 ```
 
 - Produce a graph showing, for each topic, the probability with which the topic is selected.
-
 
 - Produce a table showing, for each topic, the 10 words with the highest probability for that topic.
 
