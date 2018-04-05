@@ -60,33 +60,42 @@ for (j in 1:TopicCount) {
   s = e + 1
   e = e + bat_size
 }
-
-Log_P = log(P)
-Log_pi = log(pi)
 ```
 
 $$
-\omega_{i,j}=\frac{\left[\prod_{k} p_{j,k}^{x_{i,k}}\right]\pi_j}{ \sum_{l} \left[\prod_{k} p_{j,k}^{x_{i,k}}\right]\pi_l}
+\omega_{i,j}=\frac{\left[\prod_{k} p_{j,k}^{x_{i,k}}\right]\pi_j}{ \sum_{l} \left[\prod_{k} p_{l,k}^{x_{i,k}}\right]\pi_l}
 $$
 We transform this equation to logsumexp form to benefit calculation
 $$
-\log(\omega_{i,j})=\sum_{k}(\log p_{j,k}^{x_{i,k}}) + \log\pi_j - LogSumExp_l(\sum_{l,k} (\log p_{j,k}^{x_{i,k}}) + \log\pi_{l})
+\log(\omega_{i,j})=\sum_{k}(x_{i,k}\log p_{j,k}) + \log\pi_j - LogSumExp_l(\sum_{k}(x_{i,k}\log p_{l,k}) + \log\pi_{l})
 $$
 
 ```{r}
-Q = 0
+library(matrixStats)
+
 Log_W = W
 
 #Calculate new Q
 
+DocLength = rowSums(DocVectors)
+
+Log_P = log(P)
+Log_pi = log(pi)
+
 #E Step
+p_j = rep(0, TopicCount)
 for (i in 1:DocCount) {
   for (j in 1:TopicCount) {
-    W[i,j] = sum(Log_P[j,] * DocVectors[i,]) + Log_pi[j]
+     p_j[j] = sum(Log_P[j,] * DocVectors[i,]) + Log_pi[j] //todo:optimize
   }
+  
+  Log_W[i,] = p_j - logSumExp(p_j)
 }
-#M Step
 
+W = exp(Log_W)
+#M Step
+P = (t(W) %*% DocVectors) / c(t(W) %*% DocLength)
+pi = colSums(W) / DocCount
 ```
 
 - Produce a graph showing, for each topic, the probability with which the topic is selected.
