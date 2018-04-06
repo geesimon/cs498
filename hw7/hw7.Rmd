@@ -10,58 +10,24 @@ output:
 
 
 #Problem 1
-**EM Topic models** The UCI Machine Learning dataset repository hosts several datasets recording word counts for documents here. You will use the NIPS dataset. You will find (a) a table of word counts per document and (b) a vocabulary list for this dataset at the link. You must implement the multinomial mixture of topics model, lectured in class. For this problem, you should write the clustering code yourself (i.e. not use a package for clustering).
+**EM Topic models** The UCI Machine Learning dataset repository hosts several datasets recording word counts for documents here. You will use the NIPS dataset. You will find (a) a table of word counts per document and (b) a vocabulary list for this dataset at the link. You must implement the multinomial mixture of topics model.
 
 ```{r}
 #Load data
 header = readLines("docword.nips.txt", n = 2)
 DocCount = as.integer(header[1])
-CocabSize = as.integer(header[2])
+VocabSize = as.integer(header[2])
 df = read.table("docword.nips.txt", skip=3)
 
-DocVectors = matrix(0, DocCount, CocabSize)
+DocVectors = matrix(0, DocCount, VocabSize)
 for (i in 1:(dim(df)[1])){
   DocVectors[df[i, 1],df[i, 2]] = df[i, 3]
 }
 ```
 
-- Cluster this to 30 topics, using a simple mixture of multinomial topic model, as lectured in class.
+- Cluster this to 30 topics, using a simple mixture of multinomial topic model.
 
-
-```{r}
-#Initialize P and Pi
-TopicCount = 30
-
-P  = matrix(0, TopicCount, CocabSize)
-pi = rep(0, TopicCount)
-W  = matrix(0, DocCount, TopicCount)
-
-#k = kmeans(DocVectors, 30)
-
-#Randomly sample docs
-iDocs = sample(1:DocCount, DocCount)
-
-bat_size = round(DocCount / TopicCount)
-s = 1
-e = bat_size
-
-for (j in 1:TopicCount) {
-  if (e > DocCount) e = DocCount
-  
-  iBatch = iDocs[s:e]
-  
-  #count words and add smoothing
-  words = colSums(DocVectors[iBatch,]) + 1e-2
-  
-  #Calculate P and Pi
-  P[j,]  = words / sum(words)
-  pi[j] = length(iBatch) / DocCount
-  
-  s = e + 1
-  e = e + bat_size
-}
-```
-
+We have,
 $$
 \omega_{i,j}=\frac{\left[\prod_{k} p_{j,k}^{x_{i,k}}\right]\pi_j}{ \sum_{l} \left[\prod_{k} p_{l,k}^{x_{i,k}}\right]\pi_l}
 $$
@@ -73,37 +39,123 @@ $$
 ```{r}
 library(matrixStats)
 
-Log_W = W
+topic_EM = function(docs, vocab.size, topic.count, threshold = 1e-7){
+  #Initialize P and Pi
+  doc_count = dim(docs)[1]
+  doc_length = rowSums(docs)
+  P  = matrix(0, topic.count, vocab.size)
+  pi = rep(0, topic.count)
+  W = matrix(0, doc_count, topic.count)
+  old_W  = W
+  log_W = W
+  
+  #Randomly sample docs
+  i_doc = sample(1:doc_count, doc_count)
+  
+  bat_size = round(doc_count / topic.count)
+  s = 1
+  e = bat_size
+  
+  for (j in 1:topic.count) {
+    if (e > doc_count) e = doc_count
+    
+    i_bat = i_doc[s:e]
+    
+    #count words and add smoothing
+    words = colSums(docs[i_bat,])
+    
+    #Calculate P and Pi
+    P[j,]  = words / sum(words)
+    pi[j] = length(i_bat) / doc_count
+    
+    s = e + 1
+    e = e + bat_size
+  }
 
-#Calculate new Q
+  #Iterately perform E and M steps
+  for (iter in 1:1000) {
+    #smooth P
+    P = P + 1e-7
+    P = P / rowSums(P)
+    
+    log_P = log(P)
+    log_pi = log(pi)
+    
+    #Calculate Q (for testing only)
+    # X_log_P = docs %*% t(log(P))
+    # Q = 0
+    # for (i in 1:doc_count) {
+    #   for (j in 1:topic.count){
+    #     Q = Q + (X_log_P[i,j] + log_pi[j]) * W[i,j]
+    #   }
+    # }
+    # print(paste("Q=",Q, sep=""))
+    
+    #E Step
+    X_log_P = docs %*% t(log_P)
+    for (i in 1:doc_count) {
+      log_W[i, ] = X_log_P[i, ] + log_pi
+      log_W[i, ] = log_W[i, ] - logSumExp(log_W[i, ])
+    }
 
-DocLength = rowSums(DocVectors)
-
-Log_P = log(P)
-Log_pi = log(pi)
-
-#E Step
-p_j = rep(0, TopicCount)
-for (i in 1:DocCount) {
-  for (j in 1:TopicCount) {
-     p_j[j] = sum(Log_P[j,] * DocVectors[i,]) + Log_pi[j] //todo:optimize
+    W = exp(log_W)
+    t_W = t(W)
+    
+    d = max(abs(W - old_W))
+    print(paste("Iteration=", iter, ", D=", d, sep=""))
+    if(d < threshold) break()
+    
+    old_W = W
+    
+    #M Step
+    P = (t_W %*% docs) / c(t_W %*% doc_length)
+    pi = colSums(W) / doc_count
   }
   
-  Log_W[i,] = p_j - logSumExp(p_j)
+  return (list(W=old_W, P=P, pi=pi))
 }
+```
 
-W = exp(Log_W)
-#M Step
-P = (t(W) %*% DocVectors) / c(t(W) %*% DocLength)
-pi = colSums(W) / DocCount
+```{r}
+TopicCount = 30
+
+r=topic_EM(DocVectors, VocabSize, TopicCount)
 ```
 
 - Produce a graph showing, for each topic, the probability with which the topic is selected.
+```{r}
+plot(r$pi, xlab = "Cluster #", ylab = "P", ylim = c(0, 0.05),
+     col = "dodgerblue", pch = 20, cex = 1.5)
+```
 
 - Produce a table showing, for each topic, the 10 words with the highest probability for that topic.
+```{r}
+top_10 = matrix(0, TopicCount, 10)
+P = r$P
+
+for (i in 1:TopicCount) {
+  for (j in 1: 10) {
+    top_10[i, j] = which.max(P[i,])
+    P[i, top_10[i, j]] = 0
+  }
+}
+
+print(top_10)
+```
+
 
 #Problem 2
 **Image segmentation using EM** You can segment an image using a clustering method - each segment is the cluster center to which a pixel belongs. In this exercise, you will represent an image pixel by its r, g, and b values (so use color images!). Use the EM algorithm applied to the mixture of normal distribution model lectured in class to cluster image pixels, then segment the image by mapping each pixel to the cluster center with the highest value of the posterior probability for that pixel. You must implement the EM algorithm yourself (rather than using a package). Test images are here, and you should display results for all three of them. Till then, use any color image you care to.
 
+
+```{r}
+library(jpeg)
+
+read_image = function(file.name){
+  return (readJPEG(file.name))
+}
+```
+
 - Segment each of the test images to 10, 20, and 50 segments. You should display these segmented images as images, where each pixel's color is replaced with the mean color of the closest segment
+
 - We will identify one special test image. You should segment this to 20 segments using five different start points, and display the result for each case. Is there much variation in the result?
