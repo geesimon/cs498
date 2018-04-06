@@ -156,6 +156,15 @@ read_image = function(file.name){
 }
 ```
 
+```{r}
+#img= read_image("RobertMixed03.jpg")
+#img= read_image("smallstrelitzia.jpg")
+img= read_image("smallsunset.jpg")
+
+plot(c(0, dim(img)[2]), c(0, dim(img)[1]), type="n")
+rasterImage(img, 0, 0, dim(img)[2], dim(img)[1])
+```
+
 - Segment each of the test images to 10, 20, and 50 segments. You should display these segmented images as images, where each pixel's color is replaced with the mean color of the closest segment
 
 - We will identify one special test image. You should segment this to 20 segments using five different start points, and display the result for each case. Is there much variation in the result?
