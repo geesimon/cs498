@@ -39,7 +39,7 @@ $$
 ```{r}
 library(matrixStats)
 
-topic_EM = function(docs, vocab.size, topic.count, threshold = 1e-7){
+topic_EM = function(docs, vocab.size, topic.count, converge.threshold = 1e-7){
   #Initialize P and Pi
   doc_count = dim(docs)[1]
   doc_length = rowSums(docs)
@@ -53,13 +53,10 @@ topic_EM = function(docs, vocab.size, topic.count, threshold = 1e-7){
   i_doc = sample(1:doc_count, doc_count)
   
   bat_size = round(doc_count / topic.count)
-  s = 1
-  e = bat_size
+  indexes = c(seq(from = 1, to = doc_count, by = bat_size), doc_count + 1)
   
   for (j in 1:topic.count) {
-    if (e > doc_count) e = doc_count
-    
-    i_bat = i_doc[s:e]
+    i_bat = i_doc[indexes[j]:(indexes[j + 1] - 1)]
     
     #count words and add smoothing
     words = colSums(docs[i_bat,])
@@ -67,9 +64,6 @@ topic_EM = function(docs, vocab.size, topic.count, threshold = 1e-7){
     #Calculate P and Pi
     P[j,]  = words / sum(words)
     pi[j] = length(i_bat) / doc_count
-    
-    s = e + 1
-    e = e + bat_size
   }
 
   #Iterately perform E and M steps
@@ -77,19 +71,9 @@ topic_EM = function(docs, vocab.size, topic.count, threshold = 1e-7){
     #smooth P
     P = P + 1e-7
     P = P / rowSums(P)
-    
     log_P = log(P)
-    log_pi = log(pi)
     
-    #Calculate Q (for testing only)
-    # X_log_P = docs %*% t(log(P))
-    # Q = 0
-    # for (i in 1:doc_count) {
-    #   for (j in 1:topic.count){
-    #     Q = Q + (X_log_P[i,j] + log_pi[j]) * W[i,j]
-    #   }
-    # }
-    # print(paste("Q=",Q, sep=""))
+    log_pi = log(pi)
     
     #E Step
     X_log_P = docs %*% t(log_P)
@@ -98,12 +82,13 @@ topic_EM = function(docs, vocab.size, topic.count, threshold = 1e-7){
       log_W[i, ] = log_W[i, ] - logSumExp(log_W[i, ])
     }
 
+    #print(log_W[1,])
     W = exp(log_W)
     t_W = t(W)
     
     d = max(abs(W - old_W))
     print(paste("Iteration=", iter, ", D=", d, sep=""))
-    if(d < threshold) break()
+    if(d < converge.threshold) break()
     
     old_W = W
     
@@ -112,7 +97,79 @@ topic_EM = function(docs, vocab.size, topic.count, threshold = 1e-7){
     pi = colSums(W) / doc_count
   }
   
-  return (list(W=old_W, P=P, pi=pi))
+  return (list(P=P, pi=pi))
+}
+
+logDotExp = function(A, B) {
+  max_a = max(A)
+  max_b = max(B)
+  exp_a = exp(A - max_a)
+  exp_b = exp(B - max_b)
+
+  C = log(exp_a %*% exp_b)
+  
+  return (C + max_a + max_b)
+}
+
+log_topic_EM = function(docs, vocab.size, topic.count, converge.threshold = 1e-7){
+  #Initialize P and Pi
+  doc_count = dim(docs)[1]
+  doc_length = rowSums(docs)
+  P  = matrix(0, topic.count, vocab.size)
+  pi = rep(0, topic.count)
+  log_W = matrix(-10000, doc_count, topic.count)
+  old_log_W = log_W
+  converge.threshold = abs(log(converge.threshold, 10))
+  
+  #Randomly sample docs
+  i_doc = sample(1:doc_count, doc_count)
+  
+  bat_size = round(doc_count / topic.count)
+  indexes = c(seq(from = 1, to = doc_count, by = bat_size), doc_count + 1)
+  
+  for (j in 1:topic.count) {
+    i_bat = i_doc[indexes[j]:(indexes[j + 1] - 1)]
+    
+    #count words and add smoothing
+    words = colSums(docs[i_bat,]) + (0.01 / topic.count) #smoothing
+    
+    #Calculate P and Pi
+    P[j,]  = words / sum(words)
+    pi[j] = length(i_bat) / doc_count
+  }
+
+  log_P = log(P)
+  log_pi = log(pi)
+
+  #Iterately perform E and M steps
+  log_docs = log(docs)
+  log_docs[log_docs < -10000] = -10000
+  doc_count_zeros = matrix(0, doc_count, 1)
+  
+  for (iter in 1:10000) {
+    #E Step
+    X_log_P = docs %*% t(log_P)
+    for (i in 1:doc_count) {
+      log_W[i, ] = X_log_P[i, ] + log_pi
+      log_W[i, ] = log_W[i, ] - logSumExp(log_W[i, ])
+    }
+
+    t_log_W = t(log_W)
+    D = log_W - old_log_W
+    d = max(abs(D))
+    print(paste("Iteration=", iter, ", D=", d, sep=""))
+    if(d < converge.threshold) break()
+
+    old_log_W = log_W
+    
+    #M Step
+    log_P = logDotExp(t_log_W, log_docs) - c(logDotExp(t_log_W, log(doc_length)))
+    log_pi = logDotExp(t_log_W, doc_count_zeros) - log(doc_count)
+
+    log_P[log_P < -10000] = -10000
+  }
+  
+  return (list(P=exp(log_P), pi = exp(log_pi)))
 }
 ```
 
@@ -120,6 +177,7 @@ topic_EM = function(docs, vocab.size, topic.count, threshold = 1e-7){
 TopicCount = 30
 
 r=topic_EM(DocVectors, VocabSize, TopicCount)
+#log_r=log_topic_EM(DocVectors, VocabSize, TopicCount)
 ```
 
 - Produce a graph showing, for each topic, the probability with which the topic is selected.
@@ -158,13 +216,56 @@ read_image = function(file.name){
 
 ```{r}
 #img= read_image("RobertMixed03.jpg")
-#img= read_image("smallstrelitzia.jpg")
-img= read_image("smallsunset.jpg")
+img= read_image("smallstrelitzia.jpg")
+#img= read_image("smallsunset.jpg")
+old_dim = dim(img)
+
+plot(c(0, dim(img)[2]), c(0, dim(img)[1]), type="n")
+rasterImage(img, 0, 0, dim(img)[2], dim(img)[1])
+dim(img) = c(dim(img)[1] * dim(img)[2], 3)
+c= kmeans(img, 20)
+
+for (i in 1:length(c$cluster)){
+  img[i,] = c$centers[c$cluster[i],]
+}
+
+dim(img) = old_dim
+
 
 plot(c(0, dim(img)[2]), c(0, dim(img)[1]), type="n")
 rasterImage(img, 0, 0, dim(img)[2], dim(img)[1])
 ```
 
 - Segment each of the test images to 10, 20, and 50 segments. You should display these segmented images as images, where each pixel's color is replaced with the mean color of the closest segment
+
+```{r}
+GMM_EM = function(X, cluster.count) {
+  N = dim(X)[1]
+  #Take kmean as the initial value for U and Pi
+  kmeans_cluster = kmeans(X, cluster.count)
+  
+  U = kmeans_cluster$centers
+  pi = rep(0, cluster.count) 
+  for (i in 1:cluster.count){
+    pi[i] = sum(kmeans_cluster$cluster == i) / N
+  }
+  
+  W = matrix(0, N, cluster.count)
+  for (i in 1:10000) {
+    #E Step
+    for (j in 1:cluster.count) {
+      D = t(X) - U[j]
+      W[,j] = exp(-0.5 * colSums(D ^ 2)) * pi[j]
+    }
+    W = W / rowSums(W)
+    
+    #M Step
+    
+  }
+  
+  return (list(centers = U, pi=pi))
+}
+
+```
 
 - We will identify one special test image. You should segment this to 20 segments using five different start points, and display the result for each case. Is there much variation in the result?
