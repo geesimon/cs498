@@ -251,8 +251,10 @@ GMM_EM = function(X, cluster.count, converge.threshold = 1e-7) {
   }
   
   W = matrix(0, N, cluster.count)
-  old_W = matrix(0, N, cluster.count)
-    
+  old_W = W
+  
+  #Need use logSumExp
+  
   for (iter in 1:10000) {
     #E Step
     for (j in 1:cluster.count) {
@@ -279,7 +281,7 @@ GMM_EM = function(X, cluster.count, converge.threshold = 1e-7) {
 
 
 ```{r}
-r = GMM_EM(img, 10)
+r = GMM_EM(img * 255, 10)
 ```
 
 
