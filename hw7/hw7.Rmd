@@ -239,7 +239,7 @@ rasterImage(img, 0, 0, dim(img)[2], dim(img)[1])
 - Segment each of the test images to 10, 20, and 50 segments. You should display these segmented images as images, where each pixel's color is replaced with the mean color of the closest segment
 
 ```{r}
-GMM_EM = function(X, cluster.count) {
+GMM_EM = function(X, cluster.count, converge.threshold = 1e-7) {
   N = dim(X)[1]
   #Take kmean as the initial value for U and Pi
   kmeans_cluster = kmeans(X, cluster.count)
@@ -251,7 +251,9 @@ GMM_EM = function(X, cluster.count) {
   }
   
   W = matrix(0, N, cluster.count)
-  for (i in 1:10000) {
+  old_W = matrix(0, N, cluster.count)
+    
+  for (iter in 1:10000) {
     #E Step
     for (j in 1:cluster.count) {
       D = t(X) - U[j]
@@ -259,13 +261,27 @@ GMM_EM = function(X, cluster.count) {
     }
     W = W / rowSums(W)
     
-    #M Step
+    d = max(abs(W - old_W))
+    print(paste("Iteration=", iter, ", D=", d, sep=""))
+    if(d < converge.threshold) break()
     
+    old_W = W
+    
+    #M Step
+    w_sum = colSums(W)
+    U = crossprod(W, X) / w_sum
+    pi = w_sum / N
   }
   
   return (list(centers = U, pi=pi))
 }
-
 ```
 
+
+```{r}
+r = GMM_EM(img, 10)
+```
+
+
 - We will identify one special test image. You should segment this to 20 segments using five different start points, and display the result for each case. Is there much variation in the result?
+
