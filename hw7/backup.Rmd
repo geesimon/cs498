@@ -115,3 +115,133 @@ GMM_EM = function(X, cluster.count, converge.threshold = 1e-7) {
 }
 ```
 
+```{r}
+GMM_EM = function(X, cluster.count, converge.threshold = 1e-7) {
+  N = dim(X)[1]
+  W = matrix(0, N, cluster.count)
+  #Take kmean as the initial value for U and Pi
+  kmeans_cluster = kmeans(X, cluster.count)
+  
+  U = kmeans_cluster$centers
+  pi = kmeans_cluster$size / N
+  for (j in 1:cluster.count){
+    W[kmeans_cluster$cluster == j, j] = 1
+  }
+  
+  #return (list(W = W, centers = kmeans_cluster$centers, pi=pi))
+  
+  old_W = W
+  log_W = W
+
+  for (iter in 1:10000) {
+    log_pi = log(pi)
+    #E Step
+    # for (j in 1:cluster.count) {
+    #   D = X - U[j]
+    #   log_W[,j] = (-0.5 * rowSums(D ^ 2)) + log_pi[j]
+    # }
+    # for (i in 1:N) {
+    #   log_W[i, ] = log_W[i,] - logSumExp(log_W[i,])
+    # }
+    for (i in 1:N) {
+      for (j in 1:cluster.count){
+        d_ij = X[i,] - U[j]
+        d_min = X[i,] - U[which.max(W[i,]),]
+        d = sum(d_ij * d_ij) - sum(d_min * d_min)
+        print(d)
+        pi[j] * exp(-0.5 * d)
+      }
+      W[i,] = W[i,] / sum(W[i,])
+    }
+    
+    #W = exp(log_W)
+    d = mean(abs(W - old_W))
+    print(paste("Iteration=", iter, ", D=", d, sep=""))
+    if(d < converge.threshold) break()
+    
+    old_W = W
+    
+    #M Step
+    # log_w_j = logDotExp(t_log_W, n_zeros)
+    # U = exp(logDotExp(t_log_W, log_X) - c(log_w_j))
+    # log_pi = log_w_j - log(N)
+    w_sum = colSums(W)
+    U = crossprod(W, X) / w_sum
+    # for (j in 1:cluster.count) {
+    #   U[j,] = colSums(X * W[,j]) / w_sum[j]
+    # }
+    pi = w_sum / N
+    
+    #print(log_pi)
+    print(U)
+  }
+  
+  return (list(W = W, centers = U, pi=pi))
+}
+
+```
+
+```{r}
+GMM_EM_Matrix = function(X, cluster.count, converge.threshold = 1e-7) {
+  N = dim(X)[1]
+  W = matrix(0, N, cluster.count)
+  one_dk = matrix(1, dim(X)[2], cluster.count)
+  one_nd = matrix(1, N, dim(X)[2])
+  one_kn = matrix(1, cluster.count, N)
+  one_n1 = matrix(1, N, 1)
+  
+  #Take kmean as the initial value for U and Pi
+  kmeans_cluster = kmeans(X, cluster.count)
+  
+  U = kmeans_cluster$centers
+  pi = kmeans_cluster$size / N
+  for (j in 1:cluster.count){
+    W[kmeans_cluster$cluster == j, j] = 1
+  }
+  
+  old_W = W
+  log_W = W
+
+  for (iter in 1:10000){
+    #E step
+    H1 = (X * X) %*% one_dk
+    H2 = one_nd %*% t(U * U)
+    H3 = X %*% t(U)
+    H  = - 1/2*(H1 + H2 - 2*H3)
+    
+    P = t(matrix(pi, cluster.count, N))
+    E = exp(H) * P
+    log_E = H + log(P)
+    f = rep(0, N)
+    for (i in 1:N){
+      f[i] = logSumExp(log_E[i,])
+    }
+    log_F = matrix(f, N, cluster.count)
+    log_W = log_E - log_F
+
+    W = exp(log_W)
+    
+    d = mean(abs(W - old_W))
+    print(paste("Iteration=", iter, ", D=", d, sep=""))
+    if(d < converge.threshold) break()
+    
+    old_W = W
+    
+    #M Step
+    # D = t(W) %*% X
+    # G = t(W) %*% one_nd
+    # U = D / G
+    # 
+    # pi = (t(W) %*% one_n1) / N
+    w_sum = colSums(W)
+    U = crossprod(W, X) / w_sum
+    pi = w_sum / N
+
+    
+    print(U)
+  }
+
+  return (list(W = W, centers = U, pi=pi))
+}
+```
+

@@ -119,7 +119,7 @@ log_topic_EM = function(docs, vocab.size, topic.count, converge.threshold = 1e-7
   pi = rep(0, topic.count)
   log_W = matrix(-10000, doc_count, topic.count)
   old_log_W = log_W
-  converge.threshold = abs(log(converge.threshold, 10))
+  #converge.threshold = abs(log(converge.threshold, 10))
   
   #Randomly sample docs
   i_doc = sample(1:doc_count, doc_count)
@@ -155,8 +155,8 @@ log_topic_EM = function(docs, vocab.size, topic.count, converge.threshold = 1e-7
     }
 
     t_log_W = t(log_W)
-    D = log_W - old_log_W
-    d = max(abs(D))
+
+    d = max(abs(exp(log_W) - exp(old_log_W)))
     print(paste("Iteration=", iter, ", D=", d, sep=""))
     if(d < converge.threshold) break()
 
@@ -239,7 +239,7 @@ rasterImage(img, 0, 0, dim(img)[2], dim(img)[1])
 - Segment each of the test images to 10, 20, and 50 segments. You should display these segmented images as images, where each pixel's color is replaced with the mean color of the closest segment
 
 ```{r}
-GMM_EM = function(X, cluster.count, converge.threshold = 1e-7) {
+GMM_EM = function(X, cluster.count, converge.threshold = 1e-4) {
   N = dim(X)[1]
   W = matrix(0, N, cluster.count)
   #Take kmean as the initial value for U and Pi
@@ -247,60 +247,39 @@ GMM_EM = function(X, cluster.count, converge.threshold = 1e-7) {
   
   U = kmeans_cluster$centers
   pi = kmeans_cluster$size / N
-  for (j in 1:cluster.count){
-    W[kmeans_cluster$cluster == j, j] = 1
-  }
-  
-  #return (list(W = W, centers = kmeans_cluster$centers, pi=pi))
-  
+
   old_W = W
   log_W = W
-
+  
   for (iter in 1:10000) {
     log_pi = log(pi)
     #E Step
-    # for (j in 1:cluster.count) {
-    #   D = X - U[j]
-    #   log_W[,j] = (-0.5 * rowSums(D ^ 2)) + log_pi[j]
-    # }
-    # for (i in 1:N) {
-    #   log_W[i, ] = log_W[i,] - logSumExp(log_W[i,])
-    # }
-    for (i in 1:N) {
-      for (j in 1:cluster.count){
-        d_ij = X[i,] - U[j]
-        d_min = X[i,] - U[which.max(W[i,]),]
-        d = sum(d_ij * d_ij) - sum(d_min * d_min)
-        print(d)
-        pi[j] * exp(-0.5 * d)
-      }
-      W[i,] = W[i,] / sum(W[i,])
+    for (j in 1:cluster.count) {
+      D = t(X) - U[j,]
+      log_W[,j] = (-0.5 * colSums(D * D)) + log_pi[j]
     }
-    
-    #W = exp(log_W)
+    for (i in 1:N) {
+      log_W[i, ] = log_W[i,] - logSumExp(log_W[i,])
+    }
+
+    W = exp(log_W)
     d = mean(abs(W - old_W))
+    
     print(paste("Iteration=", iter, ", D=", d, sep=""))
+    flush.console()
     if(d < converge.threshold) break()
     
     old_W = W
     
     #M Step
-    # log_w_j = logDotExp(t_log_W, n_zeros)
-    # U = exp(logDotExp(t_log_W, log_X) - c(log_w_j))
-    # log_pi = log_w_j - log(N)
     w_sum = colSums(W)
     U = crossprod(W, X) / w_sum
-    # for (j in 1:cluster.count) {
-    #   U[j,] = colSums(X * W[,j]) / w_sum[j]
-    # }
     pi = w_sum / N
-    
-    #print(log_pi)
-    print(U)
   }
   
   return (list(W = W, centers = U, pi=pi))
 }
+
 
 segment_image = function(filename, cluster.count) {
   img = readJPEG(filename)
@@ -314,25 +293,36 @@ segment_image = function(filename, cluster.count) {
     img[i,] = r$centers[which.max(r$W[i,]),]
   }
   dim(img) = old_dim
-  plot(c(0, dim(img)[2]), c(0, dim(img)[1]), type="n")
-  rasterImage(img, 0, 0, dim(img)[2], dim(img)[1])
+
+  return (img)
 }
 ```
 
 
 ```{r}
-img = readJPEG("smallstrelitzia.jpg")
-dim(img) = c(dim(img)[1] * dim(img)[2], 3)
-X = img * 255
-cluster.count = 10
-converge.threshold = 1e-7
-
-r = GMM_EM(X, 10)
+# img = readJPEG("smallstrelitzia.jpg")
+# dim(img) = c(dim(img)[1] * dim(img)[2], 3)
+# X = img * 255
+# cluster.count = 10
+# converge.threshold = 1e-7
+# 
+# r = GMM_EM(X, 10)
 ```
 
 ```{r}
 #segment_image("smallstrelitzia.jpg", 10)
-segment_image("smallsunset.jpg", 10)
+image_names = c("RobertMixed03.jpg", "smallstrelitzia.jpg", "smallsunset.jpg")
+clusters = c(10, 20, 50)
+
+for (name in image_names) {
+  for (c in clusters) {
+    img = segment_image(name, c)
+    plot(c(0, dim(img)[2]), c(0, dim(img)[1]), type="n", 
+         main=paste(name, ", Segments=",c, sep=""),
+         xlab = "X", ylab = "Y")
+    rasterImage(img, 0, 0, dim(img)[2], dim(img)[1]) 
+  }
+}
 ```
 
 - We will identify one special test image. You should segment this to 20 segments using five different start points, and display the result for each case. Is there much variation in the result?
