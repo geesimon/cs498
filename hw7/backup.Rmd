@@ -74,3 +74,44 @@ topic_EM = function(docs, vocab.size, topic.count, threshold = 1e-7){
 }
 ```
 
+```{r}
+GMM_EM = function(X, cluster.count, converge.threshold = 1e-7) {
+  N = dim(X)[1]
+  #Take kmean as the initial value for U and Pi
+  kmeans_cluster = kmeans(X, cluster.count)
+  
+  U = kmeans_cluster$centers
+  pi = rep(0, cluster.count) 
+  for (i in 1:cluster.count){
+    pi[i] = sum(kmeans_cluster$cluster == i) / N
+  }
+  
+  W = matrix(0, N, cluster.count)
+  old_W = W
+  
+  #Need use logSumExp
+  
+  for (iter in 1:10000) {
+    #E Step
+    for (j in 1:cluster.count) {
+      D = t(X) - U[j]
+      W[,j] = exp(-0.5 * colSums(D ^ 2)) * pi[j]
+    }
+    W = W / rowSums(W)
+    
+    d = max(abs(W - old_W))
+    print(paste("Iteration=", iter, ", D=", d, sep=""))
+    if(d < converge.threshold) break()
+    
+    old_W = W
+    
+    #M Step
+    w_sum = colSums(W)
+    U = crossprod(W, X) / w_sum
+    pi = w_sum / N
+  }
+  
+  return (list(centers = U, pi=pi))
+}
+```
+

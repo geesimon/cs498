@@ -250,38 +250,82 @@ GMM_EM = function(X, cluster.count, converge.threshold = 1e-7) {
     pi[i] = sum(kmeans_cluster$cluster == i) / N
   }
   
-  W = matrix(0, N, cluster.count)
-  old_W = W
+  log_W = matrix(-10000, N, cluster.count)
+  log_W_old = log_W
+  old_W = matrix(0, N, cluster.count)
+  #log_X = log(X)
+  #log_pi = log(pi)
+  #log_X[log_X < -10000] = -10000
+  #n_zeros = matrix(0, N, 1)
   
-  #Need use logSumExp
-  
-  for (iter in 1:10000) {
+  for (iter in 1:5) {
+    log_pi = log(pi)
     #E Step
     for (j in 1:cluster.count) {
       D = t(X) - U[j]
-      W[,j] = exp(-0.5 * colSums(D ^ 2)) * pi[j]
+      log_W[,j] = (-0.5 * colSums(D ^ 2)) + log_pi[j]
+      
+      #W[,j] = exp(-0.5 * colSums(D ^ 2)) * log_pi[j]
     }
-    W = W / rowSums(W)
+    for (i in 1:N) {
+      log_W[i, ] = log_W[i,] - logSumExp(log_W[i,])
+      
+      #W[i,] = W[i,] / sum(W[i,])
+    }
     
-    d = max(abs(W - old_W))
+    W = exp(log_W)
+    d = mean(abs(W - old_W))
     print(paste("Iteration=", iter, ", D=", d, sep=""))
     if(d < converge.threshold) break()
     
     old_W = W
     
     #M Step
+    # log_w_j = logDotExp(t_log_W, n_zeros)
+    # U = exp(logDotExp(t_log_W, log_X) - c(log_w_j))
+    # log_pi = log_w_j - log(N)
     w_sum = colSums(W)
-    U = crossprod(W, X) / w_sum
+    #U = crossprod(W, X) / w_sum
+    for (j in 1:cluster.count) {
+      U[j,] = colSums(X * W[,j]) / w_sum[j]
+    }
     pi = w_sum / N
+    
+    #print(log_pi)
+    print(U)
   }
   
-  return (list(centers = U, pi=pi))
+  return (list(W = W, centers = U, pi=pi))
+}
+
+segment_image = function(filename, cluster.count) {
+  img = readJPEG(filename)
+  old_dim = dim(img)
+  dim(img) = c(dim(img)[1] * dim(img)[2], 3)
+  
+  r = GMM_EM(img * 255, cluster.count)
+  r$centers = r$centers / 255
+  
+  for (i in 1:dim(W)[1]){
+    img[i,] = r$centers[which.max(r$W[i,]),]
+  }
+  dim(img) = old_dim
+  plot(c(0, dim(img)[2]), c(0, dim(img)[1]), type="n")
+  rasterImage(img, 0, 0, dim(img)[2], dim(img)[1])
 }
 ```
 
 
 ```{r}
-r = GMM_EM(img * 255, 10)
+img = readJPEG("smallstrelitzia.jpg")
+dim(img) = c(dim(img)[1] * dim(img)[2], 3)
+X = img * 255
+cluster.count = 10
+converge.threshold = 1e-7
+
+r = GMM_EM(X, 10)
+
+segment_image("smallstrelitzia.jpg", 10)
 ```
 
 
