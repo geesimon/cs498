@@ -300,17 +300,6 @@ segment_image = function(filename, cluster.count) {
 
 
 ```{r}
-# img = readJPEG("smallstrelitzia.jpg")
-# dim(img) = c(dim(img)[1] * dim(img)[2], 3)
-# X = img * 255
-# cluster.count = 10
-# converge.threshold = 1e-7
-# 
-# r = GMM_EM(X, 10)
-```
-
-```{r}
-#segment_image("smallstrelitzia.jpg", 10)
 image_names = c("RobertMixed03.jpg", "smallstrelitzia.jpg", "smallsunset.jpg")
 clusters = c(10, 20, 50)
 
