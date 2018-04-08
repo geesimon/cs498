@@ -241,39 +241,43 @@ rasterImage(img, 0, 0, dim(img)[2], dim(img)[1])
 ```{r}
 GMM_EM = function(X, cluster.count, converge.threshold = 1e-7) {
   N = dim(X)[1]
+  W = matrix(0, N, cluster.count)
   #Take kmean as the initial value for U and Pi
   kmeans_cluster = kmeans(X, cluster.count)
   
   U = kmeans_cluster$centers
-  pi = rep(0, cluster.count) 
-  for (i in 1:cluster.count){
-    pi[i] = sum(kmeans_cluster$cluster == i) / N
+  pi = kmeans_cluster$size / N
+  for (j in 1:cluster.count){
+    W[kmeans_cluster$cluster == j, j] = 1
   }
   
-  log_W = matrix(-10000, N, cluster.count)
-  log_W_old = log_W
-  old_W = matrix(0, N, cluster.count)
-  #log_X = log(X)
-  #log_pi = log(pi)
-  #log_X[log_X < -10000] = -10000
-  #n_zeros = matrix(0, N, 1)
+  #return (list(W = W, centers = kmeans_cluster$centers, pi=pi))
   
-  for (iter in 1:5) {
+  old_W = W
+  log_W = W
+
+  for (iter in 1:10000) {
     log_pi = log(pi)
     #E Step
-    for (j in 1:cluster.count) {
-      D = t(X) - U[j]
-      log_W[,j] = (-0.5 * colSums(D ^ 2)) + log_pi[j]
-      
-      #W[,j] = exp(-0.5 * colSums(D ^ 2)) * log_pi[j]
-    }
+    # for (j in 1:cluster.count) {
+    #   D = X - U[j]
+    #   log_W[,j] = (-0.5 * rowSums(D ^ 2)) + log_pi[j]
+    # }
+    # for (i in 1:N) {
+    #   log_W[i, ] = log_W[i,] - logSumExp(log_W[i,])
+    # }
     for (i in 1:N) {
-      log_W[i, ] = log_W[i,] - logSumExp(log_W[i,])
-      
-      #W[i,] = W[i,] / sum(W[i,])
+      for (j in 1:cluster.count){
+        d_ij = X[i,] - U[j]
+        d_min = X[i,] - U[which.max(W[i,]),]
+        d = sum(d_ij * d_ij) - sum(d_min * d_min)
+        print(d)
+        pi[j] * exp(-0.5 * d)
+      }
+      W[i,] = W[i,] / sum(W[i,])
     }
     
-    W = exp(log_W)
+    #W = exp(log_W)
     d = mean(abs(W - old_W))
     print(paste("Iteration=", iter, ", D=", d, sep=""))
     if(d < converge.threshold) break()
@@ -285,10 +289,10 @@ GMM_EM = function(X, cluster.count, converge.threshold = 1e-7) {
     # U = exp(logDotExp(t_log_W, log_X) - c(log_w_j))
     # log_pi = log_w_j - log(N)
     w_sum = colSums(W)
-    #U = crossprod(W, X) / w_sum
-    for (j in 1:cluster.count) {
-      U[j,] = colSums(X * W[,j]) / w_sum[j]
-    }
+    U = crossprod(W, X) / w_sum
+    # for (j in 1:cluster.count) {
+    #   U[j,] = colSums(X * W[,j]) / w_sum[j]
+    # }
     pi = w_sum / N
     
     #print(log_pi)
@@ -306,7 +310,7 @@ segment_image = function(filename, cluster.count) {
   r = GMM_EM(img * 255, cluster.count)
   r$centers = r$centers / 255
   
-  for (i in 1:dim(W)[1]){
+  for (i in 1:dim(r$W)[1]){
     img[i,] = r$centers[which.max(r$W[i,]),]
   }
   dim(img) = old_dim
@@ -324,10 +328,12 @@ cluster.count = 10
 converge.threshold = 1e-7
 
 r = GMM_EM(X, 10)
-
-segment_image("smallstrelitzia.jpg", 10)
 ```
 
+```{r}
+#segment_image("smallstrelitzia.jpg", 10)
+segment_image("smallsunset.jpg", 10)
+```
 
 - We will identify one special test image. You should segment this to 20 segments using five different start points, and display the result for each case. Is there much variation in the result?
 
