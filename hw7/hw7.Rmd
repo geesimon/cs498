@@ -87,7 +87,7 @@ topic_EM = function(docs, vocab.size, topic.count, converge.threshold = 1e-7){
     t_W = t(W)
     
     d = max(abs(W - old_W))
-    print(paste("Iteration=", iter, ", D=", d, sep=""))
+    if (interactive()) print(paste("Iteration=", iter, ", D=", d, sep=""))
     if(d < converge.threshold) break()
     
     old_W = W
