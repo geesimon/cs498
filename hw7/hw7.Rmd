@@ -3,9 +3,9 @@ title: "Homework 7"
 author: "CS 498, Spring 2018, Xiaoming Ji"
 date: ''
 output:
+  pdf_document: default
   html_document:
     toc: yes
-  pdf_document: default
 ---
 
 
@@ -50,6 +50,67 @@ logDotExp = function(A, B) {
   C = log(exp_a %*% exp_b)
   
   return (C + max_a + max_b)
+}
+
+topic_EM = function(docs, vocab.size, topic.count, converge.threshold = 1e-7){
+  #Initialize P and Pi
+  doc_count = dim(docs)[1]
+  doc_length = rowSums(docs)
+  P  = matrix(0, topic.count, vocab.size)
+  pi = rep(0, topic.count)
+  W = matrix(0, doc_count, topic.count)
+  old_W  = W
+  log_W = W
+  
+  #Randomly sample docs
+  i_doc = sample(1:doc_count, doc_count)
+  
+  bat_size = round(doc_count / topic.count)
+  indexes = c(seq(from = 1, to = doc_count, by = bat_size), doc_count + 1)
+  
+  for (j in 1:topic.count) {
+    i_bat = i_doc[indexes[j]:(indexes[j + 1] - 1)]
+    
+    #count words and add smoothing
+    words = colSums(docs[i_bat,])
+    
+    #Calculate P and Pi
+    P[j,]  = words / sum(words)
+    pi[j] = length(i_bat) / doc_count
+  }
+
+  #Iterately perform E and M steps
+  for (iter in 1:1000) {
+    #P smoothing
+    P = P + 1e-7
+    P = P / rowSums(P)
+    log_P = log(P)
+    
+    log_pi = log(pi)
+    
+    #E Step
+    X_log_P = docs %*% t(log_P)
+    for (i in 1:doc_count) {
+      log_W[i, ] = X_log_P[i, ] + log_pi
+      log_W[i, ] = log_W[i, ] - logSumExp(log_W[i, ])
+    }
+
+    W = exp(log_W)
+    t_W = t(W)
+    
+    #M Step
+    P = (t_W %*% docs) / c(t_W %*% doc_length)
+    pi = colSums(W) / doc_count
+    
+    #check convergence
+    d = max(abs(W - old_W))
+    print(paste("Iteration=", iter, ", D=", d, sep=""))
+    if(d < converge.threshold) break()
+    
+    old_W = W
+  }
+  
+  return (list(P=P, pi=pi, iteration = iter))
 }
 
 log_topic_EM = function(docs, vocab.size, topic.count, converge.threshold = 1e-7){
@@ -117,11 +178,11 @@ log_topic_EM = function(docs, vocab.size, topic.count, converge.threshold = 1e-7
 ```{r}
 TopicCount = 30
 
-set.seed(19720816) #Only for homework, set seed for consistent output
+set.seed(100000) #Only for homework, set seed for consistent output
 r=log_topic_EM(DocVectors, VocabSize, TopicCount)
+#r=topic_EM(DocVectors, VocabSize, TopicCount)
 ```
 
-**Note:** I implemented 
 
 - Produce a graph showing, for each topic, the probability with which the topic is selected.
 ```{r}
@@ -145,6 +206,7 @@ for (i in 1:TopicCount) {
 print(top_10)
 ```
 
+**Note**: I implemented 2 versions of topic EM (log_topic_EM does all EM steps on log space) and get similar results.
 
 #Problem 2
 **Image segmentation using EM** You can segment an image using a clustering method - each segment is the cluster center to which a pixel belongs. In this exercise, you will represent an image pixel by its r, g, and b values (so use color images!). Use the EM algorithm applied to the mixture of normal distribution model lectured in class to cluster image pixels, then segment the image by mapping each pixel to the cluster center with the highest value of the posterior probability for that pixel. You must implement the EM algorithm yourself (rather than using a package). Test images are here, and you should display results for all three of them. Till then, use any color image you care to.
@@ -220,7 +282,7 @@ plot_image = function(file.name) {
 }
 ```
 
-```{r}
+```{r, message=FALSE, warning=FALSE}
 image_names = c("RobertMixed03.jpg", "smallstrelitzia.jpg", "smallsunset.jpg")
 clusters = c(10, 20, 50)
 
@@ -240,14 +302,16 @@ for (name in image_names) {
 
 ```{r, message=FALSE, warning=FALSE}
 test_image = "smallstrelitzia.jpg"
+cluster = 20
+
 results = list()
 
 for (i in 1:5) {
   #make different start points for k-means
   set.seed(i * 197208)
-  r = segment_image(test_image, 20)
+  r = segment_image(test_image, cluster)
   plot(c(0, dim(r$img)[2]), c(0, dim(r$img)[1]), type="n", 
-         main=paste(name, ", Segments=",c, sep=""),
+         main=paste(name, ", Segments=", cluster, sep=""),
          xlab = "X", ylab = "Y")
   rasterImage(r$img, 0, 0, dim(r$img)[2], dim(r$img)[1])
   results[[i]] = list(centers = r$centers, pi = r$pi)
@@ -255,7 +319,7 @@ for (i in 1:5) {
 
 ```
 
-From the output image, I do see some variations (local optimal) although the differences not are as obvious as the ones produced by different segments. The output of new centers and $\pi$ can tell the different as illustrated below.
+From the output image, I do see some small variations (for example: shadow on leaf) but the differences are not as obvious as the ones produced by different segments. The output of new centers and $\pi$ can tell the exact differences as illustrated below.
 
 ```{r}
 results[[1]]
