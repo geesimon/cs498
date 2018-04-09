@@ -299,6 +299,8 @@ test_image = "smallstrelitzia.jpg"
 results = list()
 
 for (i in 1:5) {
+  #make different start points for k-means
+  set.seed(i * 197208)
   r = segment_image(test_image, 20)
   plot(c(0, dim(r$img)[2]), c(0, dim(r$img)[1]), type="n", 
          main=paste(name, ", Segments=",c, sep=""),
