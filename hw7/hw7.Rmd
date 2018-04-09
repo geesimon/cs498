@@ -3,9 +3,9 @@ title: "Homework 7"
 author: "CS 498, Spring 2018, Xiaoming Ji"
 date: ''
 output:
-  pdf_document: default
   html_document:
     toc: yes
+  pdf_document: default
 ---
 
 
