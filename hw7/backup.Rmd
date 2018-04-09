@@ -1,23 +1,22 @@
 ```{r}
-topic_EM = function(docs, vocab.size, topic.count, threshold = 1e-7){
+topic_EM = function(docs, vocab.size, topic.count, converge.threshold = 1e-7){
   #Initialize P and Pi
   doc_count = dim(docs)[1]
   doc_length = rowSums(docs)
   P  = matrix(0, topic.count, vocab.size)
   pi = rep(0, topic.count)
-  old_t_W  = matrix(0, topic.count, doc_count)
+  W = matrix(0, doc_count, topic.count)
+  old_W  = W
+  log_W = W
   
   #Randomly sample docs
   i_doc = sample(1:doc_count, doc_count)
   
   bat_size = round(doc_count / topic.count)
-  s = 1
-  e = bat_size
+  indexes = c(seq(from = 1, to = doc_count, by = bat_size), doc_count + 1)
   
   for (j in 1:topic.count) {
-    if (e > doc_count) e = doc_count
-    
-    i_bat = i_doc[s:e]
+    i_bat = i_doc[indexes[j]:(indexes[j + 1] - 1)]
     
     #count words and add smoothing
     words = colSums(docs[i_bat,])
@@ -25,53 +24,42 @@ topic_EM = function(docs, vocab.size, topic.count, threshold = 1e-7){
     #Calculate P and Pi
     P[j,]  = words / sum(words)
     pi[j] = length(i_bat) / doc_count
-    
-    s = e + 1
-    e = e + bat_size
   }
 
   #Iterately perform E and M steps
-  for (i in 1:1000) {
+  for (iter in 1:1000) {
     #smooth P
     P = P + 1e-7
     P = P / rowSums(P)
-    
     log_P = log(P)
-    log_pi = log(pi)
     
-    #Calculate Q (for testing only)
-    W = t(old_t_W)
-    X_log_P = docs %*% t(log(P))
-    Q = 0
-    for (i in 1:doc_count) {
-      for (j in 1:topic.count){
-        Q = Q + (X_log_P[i,j] + log_pi[j]) * W[i,j]
-      }
-    }
-    print(paste("Q=",Q))
+    log_pi = log(pi)
     
     #E Step
     X_log_P = docs %*% t(log_P)
-    t_log_W = apply(X_log_P, 1, FUN=function(x_log_p){
-      p_j = x_log_p + log_pi
-      return (p_j - logSumExp(p_j))
-      })
-    
-    t_W = exp(t_log_W)
-    
-    d = max(abs(t_W - old_t_W))
-    print(d)
-    if(d < threshold) break()
-    
-    old_t_W = t_W
+    for (i in 1:doc_count) {
+      log_W[i, ] = X_log_P[i, ] + log_pi
+      log_W[i, ] = log_W[i, ] - logSumExp(log_W[i, ])
+    }
+
+    W = exp(log_W)
+    t_W = t(W)
     
     #M Step
     P = (t_W %*% docs) / c(t_W %*% doc_length)
-    pi = rowSums(t_W) / doc_count
+    pi = colSums(W) / doc_count
+    
+    #check convergence
+    d = max(abs(W - old_W))
+    print(paste("Iteration=", iter, ", D=", d, sep=""))
+    if(d < converge.threshold) break()
+    
+    old_W = W
   }
   
-  return (list(W=t(old_t_W), P=P, pi=pi))
+  return (list(P=P, pi=pi, iteration = iter))
 }
+
 ```
 
 ```{r}

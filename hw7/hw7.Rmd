@@ -23,6 +23,8 @@ DocVectors = matrix(0, DocCount, VocabSize)
 for (i in 1:(dim(df)[1])){
   DocVectors[df[i, 1],df[i, 2]] = df[i, 3]
 }
+
+VocabData = read.table("vocab.nips.txt", colClasses = "character")
 ```
 
 - Cluster this to 30 topics, using a simple mixture of multinomial topic model.
@@ -38,68 +40,6 @@ $$
 
 ```{r}
 library(matrixStats)
-
-topic_EM = function(docs, vocab.size, topic.count, converge.threshold = 1e-7){
-  #Initialize P and Pi
-  doc_count = dim(docs)[1]
-  doc_length = rowSums(docs)
-  P  = matrix(0, topic.count, vocab.size)
-  pi = rep(0, topic.count)
-  W = matrix(0, doc_count, topic.count)
-  old_W  = W
-  log_W = W
-  
-  #Randomly sample docs
-  i_doc = sample(1:doc_count, doc_count)
-  
-  bat_size = round(doc_count / topic.count)
-  indexes = c(seq(from = 1, to = doc_count, by = bat_size), doc_count + 1)
-  
-  for (j in 1:topic.count) {
-    i_bat = i_doc[indexes[j]:(indexes[j + 1] - 1)]
-    
-    #count words and add smoothing
-    words = colSums(docs[i_bat,])
-    
-    #Calculate P and Pi
-    P[j,]  = words / sum(words)
-    pi[j] = length(i_bat) / doc_count
-  }
-
-  #Iterately perform E and M steps
-  for (iter in 1:1000) {
-    #smooth P
-    P = P + 1e-7
-    P = P / rowSums(P)
-    log_P = log(P)
-    
-    log_pi = log(pi)
-    
-    #E Step
-    X_log_P = docs %*% t(log_P)
-    for (i in 1:doc_count) {
-      log_W[i, ] = X_log_P[i, ] + log_pi
-      log_W[i, ] = log_W[i, ] - logSumExp(log_W[i, ])
-    }
-
-    W = exp(log_W)
-    t_W = t(W)
-    
-    #M Step
-    P = (t_W %*% docs) / c(t_W %*% doc_length)
-    pi = colSums(W) / doc_count
-    
-    #check convergence
-    d = max(abs(W - old_W))
-    if (interactive())
-      print(paste("Iteration=", iter, ", D=", d, sep=""))
-    if(d < converge.threshold) break()
-    
-    old_W = W
-  }
-  
-  return (list(P=P, pi=pi, iteration = iter))
-}
 
 logDotExp = function(A, B) {
   max_a = max(A)
@@ -164,8 +104,7 @@ log_topic_EM = function(docs, vocab.size, topic.count, converge.threshold = 1e-7
     
     #check convergence
     d = max(abs(exp(log_W) - exp(old_log_W)))
-    if (interactive())
-      print(paste("Iteration=", iter, ", D=", d, sep=""))
+    print(paste("Iteration=", iter, ", D=", d, sep=""))
     if(d < converge.threshold) break()
 
     old_log_W = log_W
@@ -178,25 +117,28 @@ log_topic_EM = function(docs, vocab.size, topic.count, converge.threshold = 1e-7
 ```{r}
 TopicCount = 30
 
-r=topic_EM(DocVectors, VocabSize, TopicCount)
-#log_r=log_topic_EM(DocVectors, VocabSize, TopicCount)
+set.seed(19720816) #Only for homework, set seed for consistent output
+r=log_topic_EM(DocVectors, VocabSize, TopicCount)
 ```
+
+**Note:** I implemented 
 
 - Produce a graph showing, for each topic, the probability with which the topic is selected.
 ```{r}
-plot(r$pi, xlab = "Cluster #", ylab = "P", ylim = c(0, 0.05),
-     col = "dodgerblue", pch = 20, cex = 1.5)
+barplot(c(r$pi), xlab = "Cluster #", ylab = "P", 
+        col = "dodgerblue", ylim = c(0, 0.05))
 ```
 
 - Produce a table showing, for each topic, the 10 words with the highest probability for that topic.
 ```{r}
-top_10 = matrix(0, TopicCount, 10)
+top_10 = matrix("", TopicCount, 10)
 P = r$P
 
 for (i in 1:TopicCount) {
   for (j in 1: 10) {
-    top_10[i, j] = which.max(P[i,])
-    P[i, top_10[i, j]] = 0
+    top_word = which.max(P[i,])
+    P[i, top_word] = 0
+    top_10[i, j] = VocabData[top_word,]
   }
 }
 
@@ -212,8 +154,6 @@ print(top_10)
 
 ```{r}
 library(jpeg)
-
-
 
 GMM_EM = function(X, cluster.count, converge.threshold = 1e-4) {
   N = dim(X)[1]
@@ -235,9 +175,6 @@ GMM_EM = function(X, cluster.count, converge.threshold = 1e-4) {
       log_W[,j] = (-0.5 * colSums(D * D)) + log_pi[j]
     }
     log_W = log_W - rowLogSumExps(log_W)
-    # for (i in 1:N) {
-    #   log_W[i, ] = log_W[i,] - logSumExp(log_W[i,])
-    # }
 
     W = exp(log_W)
 
@@ -247,10 +184,9 @@ GMM_EM = function(X, cluster.count, converge.threshold = 1e-4) {
     pi = w_sum / N
     
     #Check convergence
-    #We use mean and small convergence threshold for this model
+    #I use mean and small convergence threshold for this model
     d = mean(abs(W - old_W))
-    print(paste("Iteration=", iter, ", D=", d, sep=""))
-    flush.console()
+    if(interactive()) print(paste("Iteration=", iter, ", D=", d, sep=""))
     if(d < converge.threshold) break()
     
     old_W = W
@@ -259,8 +195,8 @@ GMM_EM = function(X, cluster.count, converge.threshold = 1e-4) {
   return (list(W = W, centers = U, pi=pi, iteration = iter))
 }
 
-segment_image = function(filename, cluster.count) {
-  img = readJPEG(filename)
+segment_image = function(file.name, cluster.count) {
+  img = readJPEG(file.name)
   old_dim = dim(img)
   dim(img) = c(dim(img)[1] * dim(img)[2], 3)
   
@@ -274,14 +210,22 @@ segment_image = function(filename, cluster.count) {
 
   return (list(img = img, centers = r$centers, pi=r$pi))
 }
-```
 
+plot_image = function(file.name) {
+    img = readJPEG(file.name)
+    plot(c(0, dim(img)[2]), c(0, dim(img)[1]), type="n", 
+         main=paste(name, " (original)"),
+         xlab = "X", ylab = "Y")
+    rasterImage(img, 0, 0, dim(img)[2], dim(img)[1])
+}
+```
 
 ```{r}
 image_names = c("RobertMixed03.jpg", "smallstrelitzia.jpg", "smallsunset.jpg")
 clusters = c(10, 20, 50)
 
 for (name in image_names) {
+  plot_image(name)
   for (c in clusters) {
     r = segment_image(name, c)
     plot(c(0, dim(r$img)[2]), c(0, dim(r$img)[1]), type="n", 
@@ -294,7 +238,7 @@ for (name in image_names) {
 
 - We will identify one special test image. You should segment this to 20 segments using five different start points, and display the result for each case. Is there much variation in the result?
 
-```{r}
+```{r, message=FALSE, warning=FALSE}
 test_image = "smallstrelitzia.jpg"
 results = list()
 
@@ -309,5 +253,12 @@ for (i in 1:5) {
   results[[i]] = list(centers = r$centers, pi = r$pi)
 }
 
+```
+
+From the output image, I do see some variations (local optimal) although the differences not are as obvious as the ones produced by different segments. The output of new centers and $\pi$ can tell the different as illustrated below.
+
+```{r}
+results[[1]]
+results[[5]]
 ```
 
