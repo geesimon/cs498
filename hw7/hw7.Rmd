@@ -82,22 +82,23 @@ topic_EM = function(docs, vocab.size, topic.count, converge.threshold = 1e-7){
       log_W[i, ] = log_W[i, ] - logSumExp(log_W[i, ])
     }
 
-    #print(log_W[1,])
     W = exp(log_W)
     t_W = t(W)
-    
-    d = max(abs(W - old_W))
-    if (interactive()) print(paste("Iteration=", iter, ", D=", d, sep=""))
-    if(d < converge.threshold) break()
-    
-    old_W = W
     
     #M Step
     P = (t_W %*% docs) / c(t_W %*% doc_length)
     pi = colSums(W) / doc_count
+    
+    #check convergence
+    d = max(abs(W - old_W))
+    if (interactive())
+      print(paste("Iteration=", iter, ", D=", d, sep=""))
+    if(d < converge.threshold) break()
+    
+    old_W = W
   }
   
-  return (list(P=P, pi=pi))
+  return (list(P=P, pi=pi, iteration = iter))
 }
 
 logDotExp = function(A, B) {
@@ -141,7 +142,6 @@ log_topic_EM = function(docs, vocab.size, topic.count, converge.threshold = 1e-7
   log_P = log(P)
   log_pi = log(pi)
 
-  #Iterately perform E and M steps
   log_docs = log(docs)
   log_docs[log_docs < -10000] = -10000
   doc_count_zeros = matrix(0, doc_count, 1)
@@ -156,20 +156,22 @@ log_topic_EM = function(docs, vocab.size, topic.count, converge.threshold = 1e-7
 
     t_log_W = t(log_W)
 
-    d = max(abs(exp(log_W) - exp(old_log_W)))
-    print(paste("Iteration=", iter, ", D=", d, sep=""))
-    if(d < converge.threshold) break()
-
-    old_log_W = log_W
-    
     #M Step
     log_P = logDotExp(t_log_W, log_docs) - c(logDotExp(t_log_W, log(doc_length)))
     log_pi = logDotExp(t_log_W, doc_count_zeros) - log(doc_count)
 
     log_P[log_P < -10000] = -10000
+    
+    #check convergence
+    d = max(abs(exp(log_W) - exp(old_log_W)))
+    if (interactive())
+      print(paste("Iteration=", iter, ", D=", d, sep=""))
+    if(d < converge.threshold) break()
+
+    old_log_W = log_W
   }
   
-  return (list(P=exp(log_P), pi = exp(log_pi)))
+  return (list(P=exp(log_P), pi = exp(log_pi), iteration = iter))
 }
 ```
 
@@ -206,39 +208,13 @@ print(top_10)
 **Image segmentation using EM** You can segment an image using a clustering method - each segment is the cluster center to which a pixel belongs. In this exercise, you will represent an image pixel by its r, g, and b values (so use color images!). Use the EM algorithm applied to the mixture of normal distribution model lectured in class to cluster image pixels, then segment the image by mapping each pixel to the cluster center with the highest value of the posterior probability for that pixel. You must implement the EM algorithm yourself (rather than using a package). Test images are here, and you should display results for all three of them. Till then, use any color image you care to.
 
 
-```{r}
-library(jpeg)
-
-read_image = function(file.name){
-  return (readJPEG(file.name))
-}
-```
-
-```{r}
-#img= read_image("RobertMixed03.jpg")
-img= read_image("smallstrelitzia.jpg")
-#img= read_image("smallsunset.jpg")
-old_dim = dim(img)
-
-plot(c(0, dim(img)[2]), c(0, dim(img)[1]), type="n")
-rasterImage(img, 0, 0, dim(img)[2], dim(img)[1])
-dim(img) = c(dim(img)[1] * dim(img)[2], 3)
-c= kmeans(img, 20)
-
-for (i in 1:length(c$cluster)){
-  img[i,] = c$centers[c$cluster[i],]
-}
-
-dim(img) = old_dim
-
-
-plot(c(0, dim(img)[2]), c(0, dim(img)[1]), type="n")
-rasterImage(img, 0, 0, dim(img)[2], dim(img)[1])
-```
-
 - Segment each of the test images to 10, 20, and 50 segments. You should display these segmented images as images, where each pixel's color is replaced with the mean color of the closest segment
 
 ```{r}
+library(jpeg)
+
+
+
 GMM_EM = function(X, cluster.count, converge.threshold = 1e-4) {
   N = dim(X)[1]
   W = matrix(0, N, cluster.count)
@@ -258,28 +234,30 @@ GMM_EM = function(X, cluster.count, converge.threshold = 1e-4) {
       D = t(X) - U[j,]
       log_W[,j] = (-0.5 * colSums(D * D)) + log_pi[j]
     }
-    for (i in 1:N) {
-      log_W[i, ] = log_W[i,] - logSumExp(log_W[i,])
-    }
+    log_W = log_W - rowLogSumExps(log_W)
+    # for (i in 1:N) {
+    #   log_W[i, ] = log_W[i,] - logSumExp(log_W[i,])
+    # }
 
     W = exp(log_W)
-    d = mean(abs(W - old_W))
+
+    #M Step
+    w_sum = colSums(W)
+    U = crossprod(W, X) / w_sum
+    pi = w_sum / N
     
+    #Check convergence
+    #We use mean and small convergence threshold for this model
+    d = mean(abs(W - old_W))
     print(paste("Iteration=", iter, ", D=", d, sep=""))
     flush.console()
     if(d < converge.threshold) break()
     
     old_W = W
-    
-    #M Step
-    w_sum = colSums(W)
-    U = crossprod(W, X) / w_sum
-    pi = w_sum / N
   }
   
-  return (list(W = W, centers = U, pi=pi))
+  return (list(W = W, centers = U, pi=pi, iteration = iter))
 }
-
 
 segment_image = function(filename, cluster.count) {
   img = readJPEG(filename)
@@ -294,7 +272,7 @@ segment_image = function(filename, cluster.count) {
   }
   dim(img) = old_dim
 
-  return (img)
+  return (list(img = img, centers = r$centers, pi=r$pi))
 }
 ```
 
@@ -305,14 +283,29 @@ clusters = c(10, 20, 50)
 
 for (name in image_names) {
   for (c in clusters) {
-    img = segment_image(name, c)
-    plot(c(0, dim(img)[2]), c(0, dim(img)[1]), type="n", 
+    r = segment_image(name, c)
+    plot(c(0, dim(r$img)[2]), c(0, dim(r$img)[1]), type="n", 
          main=paste(name, ", Segments=",c, sep=""),
          xlab = "X", ylab = "Y")
-    rasterImage(img, 0, 0, dim(img)[2], dim(img)[1]) 
+    rasterImage(r$img, 0, 0, dim(r$img)[2], dim(r$img)[1]) 
   }
 }
 ```
 
 - We will identify one special test image. You should segment this to 20 segments using five different start points, and display the result for each case. Is there much variation in the result?
+
+```{r}
+test_image = "smallstrelitzia.jpg"
+results = list()
+
+for (i in 1:5) {
+  r = segment_image(test_image, 20)
+  plot(c(0, dim(r$img)[2]), c(0, dim(r$img)[1]), type="n", 
+         main=paste(name, ", Segments=",c, sep=""),
+         xlab = "X", ylab = "Y")
+  rasterImage(r$img, 0, 0, dim(r$img)[2], dim(r$img)[1])
+  results[[i]] = list(centers = r$centers, pi = r$pi)
+}
+
+```
 
