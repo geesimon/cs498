@@ -1,0 +1,70 @@
+---
+title: "Homework 8"
+author: "CS 498, Spring 2018, Xiaoming Ji"
+date: ''
+output:
+  html_document:
+    toc: yes
+  pdf_document: default
+---
+
+## Obtaining the dataset
+
+```{r}
+load_image_data = function(file_name){
+  img_file = file(file_name, "rb")
+  header = readBin(img_file, integer(), n = 4,  endian = "big")
+  
+  img_count = header[2]
+  data = matrix(0, img_count, 28 * 28)
+  img = readBin(img_file, integer(), size = 1, n = img_count* 28*28, endian = "big", 
+                    signed = FALSE)
+  # for (i in 1:header[2]) {
+  #   img = readBin(img_file, integer(), size = 1, n = 28*28, endian = "big", 
+  #                  signed = FALSE)
+  #   if(length(img) != 28*28) break
+  #   data[i,] = img
+  # }
+  data = matrix(img, ncol=28 * 28, byrow=T)
+  close(img_file)
+  
+  return (data)
+}
+
+load_label_data = function(file_name){
+  label_file = file(file_name, "rb")
+  header = readBin(label_file, integer(), n = 2,  endian = "big")
+  
+  data = readBin(label_file, integer(), size = 1, n = header[2], endian = "big", 
+                   signed = FALSE)
+  close(label_file)
+  
+  return (data)
+}
+
+train_data = load_image_data("./MNIST/train-images-idx3-ubyte")
+test_data = load_image_data("./MNIST/t10k-images-idx3-ubyte")
+  
+train_label = load_label_data("./MNIST/train-labels-idx1-ubyte")
+test_label = load_label_data("./MNIST/t10k-labels-idx1-ubyte")
+```
+
+```{r}
+par(mfrow=c(6,5))
+par(mar = c(0,0,0,0))
+
+index = sample(1:60000, 10)
+for(i in index)
+{
+  image(matrix(train_data[i,], 28, 28)[, 28:1], col  = gray((255:0)/255))
+}
+```
+
+## Adding pre-determined noise to the dataset
+
+```{r}
+library(readr)
+NoiseCoordinates <- read_csv("./SupplementaryAndSampleData/NoiseCoordinates.csv")
+View(NoiseCoordinates)
+```
+
