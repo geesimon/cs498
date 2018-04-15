@@ -11,28 +11,24 @@ output:
 ## Obtaining the dataset
 
 ```{r}
-load_image_data = function(file_name){
-  img_file = file(file_name, "rb")
+load_image_data = function(file.name, img.count){
+  img_file = file(file.name, "rb")
   header = readBin(img_file, integer(), n = 4,  endian = "big")
   
-  img_count = header[2]
-  data = matrix(0, img_count, 28 * 28)
-  img = readBin(img_file, integer(), size = 1, n = img_count* 28*28, endian = "big", 
+  if(img.count == -1) img.count = header[2]
+
+  data = matrix(0, img.count, 28 * 28)
+  img = readBin(img_file, integer(), size = 1, n = img.count* 28*28, endian = "big", 
                     signed = FALSE)
-  # for (i in 1:header[2]) {
-  #   img = readBin(img_file, integer(), size = 1, n = 28*28, endian = "big", 
-  #                  signed = FALSE)
-  #   if(length(img) != 28*28) break
-  #   data[i,] = img
-  # }
+
   data = matrix(img, ncol=28 * 28, byrow=T)
   close(img_file)
   
   return (data)
 }
 
-load_label_data = function(file_name){
-  label_file = file(file_name, "rb")
+load_label_data = function(file.name){
+  label_file = file(file.name, "rb")
   header = readBin(label_file, integer(), n = 2,  endian = "big")
   
   data = readBin(label_file, integer(), size = 1, n = header[2], endian = "big", 
@@ -42,21 +38,20 @@ load_label_data = function(file_name){
   return (data)
 }
 
-train_data = load_image_data("./MNIST/train-images-idx3-ubyte")
-test_data = load_image_data("./MNIST/t10k-images-idx3-ubyte")
-  
-train_label = load_label_data("./MNIST/train-labels-idx1-ubyte")
-test_label = load_label_data("./MNIST/t10k-labels-idx1-ubyte")
+train_data = load_image_data("./MNIST/train-images-idx3-ubyte", 20)
+
+#Binarize data
+train_data[(train_data / 255) < 0.5] = -1
+train_data[train_data != -1] = 1
 ```
 
 ```{r}
-par(mfrow=c(6,5))
-par(mar = c(0,0,0,0))
+par(mfrow=c(4,5))
+par(mar = c(1,1,1,1))
 
-index = sample(1:60000, 10)
-for(i in index)
+for(i in 1:20)
 {
-  image(matrix(train_data[i,], 28, 28)[, 28:1], col  = gray((255:0)/255))
+  image(matrix(train_data[i,], 28, 28)[, 28:1], col  = gray(0:1))
 }
 ```
 
@@ -64,7 +59,66 @@ for(i in index)
 
 ```{r}
 library(readr)
-NoiseCoordinates <- read_csv("./SupplementaryAndSampleData/NoiseCoordinates.csv")
-View(NoiseCoordinates)
+
+read.coordinates = function(file.name) {
+  RawData = read_csv(file.name)
+  coor_count = dim(RawData)[1] / 2 * (dim(RawData)[2] - 1)
+  coordinates = matrix(0, coor_count, 3)
+  col_count = dim(RawData)[2] - 1
+
+  r_i = 1
+  n_i = 1
+  for(r_i in 1:(dim(RawData)[1] / 2)) {
+    i = 2 * r_i - 1
+    m = regexec("[[:digit:]]+", RawData[i, 1])
+    img_num = as.integer(regmatches(RawData[i, 1], m)) + 1
+    
+    for (k in 1:col_count) {
+      coordinates[n_i, 1] = img_num
+      coordinates[n_i, 2] = as.integer(RawData[i, k + 1]) + 1
+      coordinates[n_i, 3] = as.integer(RawData[i + 1, k + 1]) + 1
+      
+      n_i = n_i + 1
+    }
+  }
+  
+  coordinates
+}
 ```
+
+```{r message=FALSE, warning=FALSE}
+NoiseCoordinates = read.coordinates("./SupplementaryAndSampleData/NoiseCoordinates.csv")
+
+noise_train_data = train_data
+for (i in 1:dim(NoiseCoordinates)[1]){
+  img_i = NoiseCoordinates[i, 1]
+  bit_i = (NoiseCoordinates[i, 2] - 1) * 28 + NoiseCoordinates[i, 3]
+
+  if(noise_train_data[img_i, bit_i] > 0) noise_train_data[img_i, bit_i] = -1
+  else noise_train_data[img_i, bit_i] = 1
+}
+
+par(mfrow=c(4,5))
+par(mar = c(1,1,1,1))
+
+for(i in 1:20)
+{
+  image(matrix(noise_train_data[i,] ,28, 28)[, 28:1], col  = gray(0:1))
+}
+```
+
+## Building a Boltzman Machine
+
+```{r message=FALSE}
+UpdateOrders = read.coordinates("./SupplementaryAndSampleData/UpdateOrderCoordinates.csv")
+InitialParameters = read.csv("./SupplementaryAndSampleData/InitialParametersModel.csv", header=FALSE)
+```
+
+```{r}
+
+MFI = function(init.Q, update.orders, theta_hh_ij, theta_hx_ij, img.data, iterations){
+  
+}
+```
+
 
