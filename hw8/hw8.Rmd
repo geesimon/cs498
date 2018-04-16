@@ -164,6 +164,8 @@ for (i in 1:IMAGE_COUNT){
 }
 ```
 
+## Turning in the energy function values computed initially and after each iteration
+
 ```{r}
 
 ```
