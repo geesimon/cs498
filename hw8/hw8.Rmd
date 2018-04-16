@@ -11,6 +11,8 @@ output:
 ## Obtaining the dataset
 
 ```{r}
+IMAGE_COUNT = 20
+
 load_image_data = function(file.name, img.count){
   img_file = file(file.name, "rb")
   header = readBin(img_file, integer(), n = 4,  endian = "big")
@@ -38,7 +40,7 @@ load_label_data = function(file.name){
   return (data)
 }
 
-train_data = load_image_data("./MNIST/train-images-idx3-ubyte", 20)
+train_data = load_image_data("./MNIST/train-images-idx3-ubyte", IMAGE_COUNT)
 
 #Binarize data
 train_data[(train_data / 255) < 0.5] = -1
@@ -66,11 +68,10 @@ read.coordinates = function(file.name) {
   coordinates = matrix(0, coor_count, 3)
   col_count = dim(RawData)[2] - 1
 
-  r_i = 1
   n_i = 1
   for(r_i in 1:(dim(RawData)[1] / 2)) {
     i = 2 * r_i - 1
-    m = regexec("[[:digit:]]+", RawData[i, 1])
+    m = regexec("[[:digit:]]+", as.character(RawData[i, 1]))
     img_num = as.integer(regmatches(RawData[i, 1], m)) + 1
     
     for (k in 1:col_count) {
@@ -111,14 +112,59 @@ for(i in 1:20)
 
 ```{r message=FALSE}
 UpdateOrders = read.coordinates("./SupplementaryAndSampleData/UpdateOrderCoordinates.csv")
-InitialParameters = read.csv("./SupplementaryAndSampleData/InitialParametersModel.csv", header=FALSE)
+InitialQ = read.csv("./SupplementaryAndSampleData/InitialParametersModel.csv", header=FALSE)
+```
+
+```{r}
+MFI = function(init.Q, update.orders, theta.hh.ij, theta.hx.ij, img.data, iterations){
+  Q = init.Q
+  
+  for (iter in 1:iterations){
+    for (c in 1:dim(update.orders)[1]) {
+      i = update.orders[c, 1]
+      j = update.orders[c, 2]
+      log_q_ij_1 = 0
+      
+      for (n_i in c(i - 1, i + 1)){
+        if (n_i > 0 && n_i <= 28){
+          for (n_j in c(j - 1, j + 1)){
+            if(n_j > 0 && n_j <= 28) {
+              log_q_ij_1 = log_q_ij_1 + theta.hh.ij * (2 * Q[n_i, n_j] - 1)
+              #print(theta.hh.ij * (2 * Q[n_i, n_j] - 1))
+            }
+          }          
+        }
+      }
+      
+      log_q_ij_1 = log_q_ij_1 + theta.hx.ij * img.data[i, j]
+
+      Q[i, j] = exp(log_q_ij_1) / (exp(log_q_ij_1) + exp(-log_q_ij_1))
+    }
+  }
+  
+  img = as.matrix(Q)
+  img[img < 0.5] = -1
+  img[img != -1] = 1
+  
+  return (img)
+}
+```
+
+```{r}
+par(mfrow=c(4,5))
+par(mar = c(1,1,1,1))
+
+for (i in 1:IMAGE_COUNT){
+  img_data = matrix(noise_train_data[i,], 28, 28, byrow = TRUE)
+  update_orders = UpdateOrders[UpdateOrders[,1] == i,2:3]
+    
+  denoised_img_data = MFI(InitialQ, update_orders, 0.8, 2, img_data, 10)
+  
+  image(t(denoised_img_data[28:1,]), col  = gray(0:1))
+}
 ```
 
 ```{r}
 
-MFI = function(init.Q, update.orders, theta_hh_ij, theta_hx_ij, img.data, iterations){
-  
-}
 ```
-
 
