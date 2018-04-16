@@ -116,8 +116,11 @@ InitialQ = read.csv("./SupplementaryAndSampleData/InitialParametersModel.csv", h
 ```
 
 ```{r}
+
 MFI = function(init.Q, update.orders, theta.hh.ij, theta.hx.ij, img.data, iterations){
+  All_Q = list()
   Q = init.Q
+  All_Q[[1]] = Q
   
   for (iter in 1:iterations){
     for (c in 1:dim(update.orders)[1]) {
@@ -125,28 +128,29 @@ MFI = function(init.Q, update.orders, theta.hh.ij, theta.hx.ij, img.data, iterat
       j = update.orders[c, 2]
       log_q_ij_1 = 0
       
-      for (n_i in c(i - 1, i + 1)){
-        if (n_i > 0 && n_i <= 28){
-          for (n_j in c(j - 1, j + 1)){
-            if(n_j > 0 && n_j <= 28) {
-              log_q_ij_1 = log_q_ij_1 + theta.hh.ij * (2 * Q[n_i, n_j] - 1)
-              #print(theta.hh.ij * (2 * Q[n_i, n_j] - 1))
-            }
-          }          
-        }
+      neighbors = matrix(c(i, j-1,i,j+1,i-1,j,i+1,j), 4, 2, byrow = TRUE)
+      for(n in 1:dim(neighbors)[1]){
+        n_i = neighbors[n, 1]
+        n_j = neighbors[n, 2]
+        
+        if(n_i > 0 && n_i <= 28 && n_j > 0 && n_j <= 28)
+          log_q_ij_1 = log_q_ij_1 + theta.hh.ij * (2 * Q[n_i, n_j] - 1)
       }
+      
       
       log_q_ij_1 = log_q_ij_1 + theta.hx.ij * img.data[i, j]
 
       Q[i, j] = exp(log_q_ij_1) / (exp(log_q_ij_1) + exp(-log_q_ij_1))
     }
+    
+    All_Q[[iter + 1]] = Q
   }
   
   img = as.matrix(Q)
   img[img < 0.5] = -1
   img[img != -1] = 1
   
-  return (img)
+  return (list(img=img, All_Q = All_Q))
 }
 ```
 
@@ -158,7 +162,7 @@ for (i in 1:IMAGE_COUNT){
   img_data = matrix(noise_train_data[i,], 28, 28, byrow = TRUE)
   update_orders = UpdateOrders[UpdateOrders[,1] == i,2:3]
     
-  denoised_img_data = MFI(InitialQ, update_orders, 0.8, 2, img_data, 10)
+  denoised_img_data = MFI(InitialQ, update_orders, 0.8, 2, img_data, 10)$img
   
   image(t(denoised_img_data[28:1,]), col  = gray(0:1))
 }
@@ -167,6 +171,47 @@ for (i in 1:IMAGE_COUNT){
 ## Turning in the energy function values computed initially and after each iteration
 
 ```{r}
+EQ = function(init.Q, theta.hh.ij, theta.hx.ij, img.data){
+  Q = init.Q
+  epsilon = 1e-10
+  
+  eq_log_q = sum((Q * log(Q + epsilon)) + ((1 - Q) * log(1 - Q + epsilon)))
+  
+  eq_log_p = 0
+  for (i in 1:dim(img.data)[1]){
+    for (j in 1:dim(img.data)[2]){
+      neighbors = matrix(c(i, j-1,i,j+1,i-1,j,i+1,j), 4, 2, byrow = TRUE)
+      
+      for(n in 1:dim(neighbors)[1]){
+        n_i = neighbors[n, 1]
+        n_j = neighbors[n, 2]
+        
+        if(n_i > 0 && n_i <= 28 && n_j > 0 && n_j <= 28)
+          eq_log_p = eq_log_p + theta.hh.ij * (2 * Q[i, j] - 1) * (2 * Q[n_i, n_j] - 1)
+      }
+      
+      eq_log_p = eq_log_p + theta.hx.ij * (2 * Q[i, j] - 1) * img.data[i, j]
+    }
+  }
+  
+  return (eq_log_q - eq_log_p)
+}
+```
 
+```{r}
+image_eq = matrix(0, 10, 11)
+
+for (i in 1:10){
+  img_data = matrix(noise_train_data[i,], 28, 28, byrow = TRUE)
+  update_orders = UpdateOrders[UpdateOrders[,1] == i,2:3]
+  
+  All_Q = MFI(InitialQ, update_orders, 0.8, 2, img_data, 10)$All_Q
+  
+  for (j in 1:11){
+    image_eq[i, j] = EQ(All_Q[[j]], 0.8, 2, img_data)
+  }
+}
+
+write.table(image_eq, file="EQ.CSV", row.names = FALSE, col.names = FALSE, sep = ",")
 ```
 
