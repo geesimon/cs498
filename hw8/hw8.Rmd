@@ -3,9 +3,9 @@ title: "Homework 8"
 author: "CS 498, Spring 2018, Xiaoming Ji"
 date: ''
 output:
+  pdf_document: default
   html_document:
     toc: yes
-  pdf_document: default
 ---
 
 ## Obtaining the dataset
@@ -199,19 +199,48 @@ EQ = function(init.Q, theta.hh.ij, theta.hx.ij, img.data){
 ```
 
 ```{r}
-image_eq = matrix(0, 10, 11)
+image_eq = matrix(0, 20, 11)
+image = matrix(0, 28, 28 * 20)
 
-for (i in 1:10){
+for (i in 1:20){
   img_data = matrix(noise_train_data[i,], 28, 28, byrow = TRUE)
   update_orders = UpdateOrders[UpdateOrders[,1] == i,2:3]
   
-  All_Q = MFI(InitialQ, update_orders, 0.8, 2, img_data, 10)$All_Q
+  r = MFI(InitialQ, update_orders, 0.8, 2, img_data, 10)
+  All_Q = r$All_Q
+  image[1:28, (28 * i - 27):(28 * i)] = r$img
   
   for (j in 1:11){
     image_eq[i, j] = EQ(All_Q[[j]], 0.8, 2, img_data)
   }
 }
 
-write.table(image_eq, file="EQ.CSV", row.names = FALSE, col.names = FALSE, sep = ",")
+image[image < 0] = 0
+
+write.table(image_eq, file="eq.csv", row.names = FALSE, col.names = FALSE, sep = ",")
+write.table(image[1:28, 281:560], file="denoised_11_20.csv", 
+            row.names = FALSE, col.names = FALSE, sep = ",")
+```
+
+## Displaying the reconstructed images
+
+```{r}
+original_image = matrix(0, 28, 28 *20)
+noise_image = matrix(0, 28, 28 *20)
+
+for (i in 1:20) {
+  img_data = matrix(train_data[i,], 28, 28, byrow = TRUE)
+  original_image[1:28, (28 * i - 27):(28 * i)] = img_data
+  
+  img_data = matrix(noise_train_data[i,], 28, 28, byrow = TRUE)
+  noise_image[1:28, (28 * i - 27):(28 * i)] = img_data
+
+}
+
+par(mfrow=c(3,1))
+par(mar = c(0,0,0,0))
+image(t(original_image[1:28, 281:560][28:1,]), col  = gray(0:1))
+image(t(noise_image[1:28, 281:560][28:1,]), col  = gray(0:1))
+image(t(image[1:28, 281:560][28:1,]), col  = gray(0:1))
 ```
 
