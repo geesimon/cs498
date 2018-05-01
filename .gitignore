@@ -3,3 +3,5 @@ cifar-10-batches-bin
 MNIST
 .Rhistory
 saved
+MNIST-data/
+.ipynb_checkpoints/
