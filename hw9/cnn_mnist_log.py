@@ -113,7 +113,7 @@ def train(mnist):
     return {inputs_: xs, targets_: ys, keep_prob: k}
   
   for i in range(FLAGS.max_steps):      
-    if i % 10 == 9:  # Record summaries and test-set accuracy
+    if i % 100 == 99:  # Record summaries and test-set accuracy
       run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
       run_metadata = tf.RunMetadata()
       summary, _ = sess.run([merged, train_step],
