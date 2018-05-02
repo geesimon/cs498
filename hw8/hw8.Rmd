@@ -217,8 +217,8 @@ for (i in 1:20){
 
 image[image < 0] = 0
 
-write.table(image_eq, file="eq.csv", row.names = FALSE, col.names = FALSE, sep = ",")
-write.table(image[1:28, 281:560], file="denoised_11_20.csv", 
+write.table(image_eq[11:12,1:2], file="energy.csv", row.names = FALSE, col.names = FALSE, sep = ",")
+write.table(image[1:28, 281:560], file="denoised.csv", 
             row.names = FALSE, col.names = FALSE, sep = ",")
 ```
 
