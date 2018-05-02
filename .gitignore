@@ -3,3 +3,6 @@ cifar-10-batches-bin
 MNIST
 .Rhistory
 saved
+.ipynb_checkpoints/
+MNIST-data/
+.vscode/
