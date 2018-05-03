@@ -56,19 +56,19 @@ def train(model_name="tutorial"):
 
   train_step = tf.train.AdamOptimizer(FLAGS.learning_rate).minimize(cross_entropy)
   
-  with tf.name_scope('accuracy'):
-    with tf.name_scope('correct_prediction'):
-      correct_prediction = tf.equal(tf.argmax(logits, 1), targets_)
-    with tf.name_scope('accuracy'):
-      accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-  
+  correct_prediction = tf.equal(tf.argmax(logits, 1), targets_)
+  accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
   tf.summary.scalar('accuracy', accuracy)
 
   # Merge all the summaries and write them out to
   # /tmp/tensorflow/mnist/logs/mnist_with_summaries (by default)
   merged = tf.summary.merge_all()
-  train_writer = tf.summary.FileWriter(FLAGS.log_dir + '/' + model_name + '/train', sess.graph)
-  test_writer = tf.summary.FileWriter(FLAGS.log_dir + '/' + model_name + '/test')
+  base_log_dir = FLAGS.log_dir + '/' + model_name
+  if tf.gfile.Exists(base_log_dir):
+    tf.gfile.DeleteRecursively(base_log_dir)
+
+  train_writer = tf.summary.FileWriter(base_log_dir + '/train', sess.graph)
+  test_writer = tf.summary.FileWriter(base_log_dir + '/test')
   tf.global_variables_initializer().run()
 
   for i in range(FLAGS.max_steps):      
