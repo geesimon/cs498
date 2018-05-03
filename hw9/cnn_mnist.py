@@ -17,8 +17,10 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import os
 import numpy as np
 import tensorflow as tf
+from tensorflow.examples.tutorials.mnist import input_data
 
 tf.logging.set_verbosity(tf.logging.INFO)
 
@@ -91,7 +93,8 @@ def cnn_model_fn(features, labels, mode):
       "classes": tf.argmax(input=logits, axis=1),
       # Add `softmax_tensor` to the graph. It is used for PREDICT and by the
       # `logging_hook`.
-      "probabilities": tf.nn.softmax(logits, name="softmax_tensor")
+      "probabilities": tf.nn.softmax(logits, name="softmax_tensor"),
+      "accuracy":  tf.reduce_mean(tf.cast(tf.equal(tf.argmax(logits, 1, output_type = tf.int32), labels), tf.float32), name="accuracy")
   }
   if mode == tf.estimator.ModeKeys.PREDICT:
     return tf.estimator.EstimatorSpec(mode=mode, predictions=predictions)
@@ -117,7 +120,10 @@ def cnn_model_fn(features, labels, mode):
 
 def main(unused_argv):
   # Load training and eval data
-  mnist = tf.contrib.learn.datasets.load_dataset("mnist")
+  data_path = os.path.join(os.getenv('TEST_TMPDIR', '/tmp'),
+                           'tensorflow/mnist/input_data'),
+  mnist = input_data.read_data_sets("/tmp/tensorflow/mnist/input_data")
+  #mnist = tf.contrib.learn.datasets.load_dataset("mnist")
   train_data = mnist.train.images  # Returns np.array
   train_labels = np.asarray(mnist.train.labels, dtype=np.int32)
   eval_data = mnist.test.images  # Returns np.array
@@ -129,9 +135,10 @@ def main(unused_argv):
 
   # Set up logging for predictions
   # Log the values in the "Softmax" tensor with label "probabilities"
-  tensors_to_log = {"probabilities": "softmax_tensor"}
+  #tensors_to_log = {"probabilities": "softmax_tensor"}
+  tensors_to_log = {"accuracy":"accuracy"}
   logging_hook = tf.train.LoggingTensorHook(
-      tensors=tensors_to_log, every_n_iter=50)
+      tensors=tensors_to_log, every_n_iter=100)
 
   # Train the model
   train_input_fn = tf.estimator.inputs.numpy_input_fn(
