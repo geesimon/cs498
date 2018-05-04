@@ -7,3 +7,4 @@ MNIST-data/
 .vscode/
 MNIST_data/
 hw8/mnist/
+__pycache__/

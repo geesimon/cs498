@@ -50,7 +50,7 @@ def train(model_name="tutorial"):
 
   logits = model_builder[model_name](inputs_, keep_prob)
   
-  cross_entropy = tf.reduce_mean(tf.losses.sparse_softmax_cross_entropy(labels=targets_, 
+  cross_entropy = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=targets_, 
                     logits=logits))
   tf.summary.scalar('cross_entropy', cross_entropy)
 
