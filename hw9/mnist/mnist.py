@@ -62,6 +62,7 @@ def train(model_name="tutorial"):
     with tf.name_scope('accuracy'):
       accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
   
+  #accuracy = tf.metrics.accuracy(labels=targets_, predictions=tf.argmax(input=logits, axis=1))
   tf.summary.scalar('accuracy', accuracy)
 
   # Merge all the summaries and write them out to
@@ -73,25 +74,24 @@ def train(model_name="tutorial"):
 
   for i in range(FLAGS.max_steps):      
     train_data, train_labels = mnist.train.next_batch(100, shuffle = True)
+    train_dict = {inputs_:train_data, targets_:train_labels, keep_prob:FLAGS.dropout}
+    test_dict = {inputs_:mnist.test.images, targets_:mnist.test.labels, keep_prob:1}
 
-    if i % 10 == 9:  # Record summaries and test-set accuracy
+    if i % 10 == 0:  # Record summaries and test-set accuracy
       run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
       run_metadata = tf.RunMetadata()
-      summary, _ = sess.run([merged, train_step],
-                              feed_dict={inputs_:train_data, targets_:train_labels, keep_prob:FLAGS.dropout},
-                              options=run_options,
-                              run_metadata=run_metadata)
+      loss, _ = sess.run([cross_entropy, train_step], feed_dict=train_dict,
+                        options=run_options, run_metadata=run_metadata)
       train_writer.add_run_metadata(run_metadata, 'step%03d' % i)
+      
+      summary, acc_train = sess.run([merged, accuracy], feed_dict=train_dict)
       train_writer.add_summary(summary, i)
 
-      summary, acc, loss = sess.run([merged, accuracy, cross_entropy], 
-                                    feed_dict={inputs_:mnist.test.images, targets_:mnist.test.labels, keep_prob:1})
+      summary, acc_test = sess.run([merged, accuracy], feed_dict=test_dict)
       test_writer.add_summary(summary, i)
-      print('Accuracy at step %s: %s, Loss %s' % (i, acc, loss))
+      print('Accuracy at step %s: %s,%s Loss %s' % (i, acc_train, acc_test, loss))
     else:
-      summary, _ = sess.run([merged, train_step], 
-                            feed_dict={inputs_:train_data, targets_:train_labels, keep_prob:FLAGS.dropout},)
-      train_writer.add_summary(summary, i)
+      sess.run([train_step], feed_dict=train_dict)
 
   train_writer.close()
   test_writer.close()
