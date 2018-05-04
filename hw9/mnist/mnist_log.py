@@ -127,13 +127,20 @@ def train(mnist):
   summary_hook = _SummaryHook(output_dir=FLAGS.log_dir, 
                     summary_op=summary_op, save_steps=FLAGS.log_frequency)
 
+  test_dict = {inputs_:mnist.test.images, targets_:mnist.test.labels, keep_prob:1}
+
   with tf.train.MonitoredSession(
         hooks=[tf.train.StopAtStepHook(last_step=FLAGS.max_steps),
-                tf.train.NanTensorHook(cross_entropy),
-                summary_hook]) as mon_sess:
+                tf.train.NanTensorHook(cross_entropy)]) as mon_sess:
         while not mon_sess.should_stop():
             batch_data, batch_labels = mnist.train.next_batch(100, shuffle = True)
-            mon_sess.run(train_op, feed_dict = {inputs_:batch_data, targets_:batch_labels, keep_prob:FLAGS.dropout})
+            step, _ = mon_sess.run([global_step, train_op], feed_dict = {inputs_:batch_data, targets_:batch_labels, 
+                keep_prob:FLAGS.dropout})
+            
+            if(step % FLAGS.log_frequency == 0):
+              accuracy_value = mon_sess.run(accuracy, feed_dict=test_dict)
+              print(accuracy_value)
+              #print('step %d, test accuracy = %f'%(step, accuracy_value))
 
 
 def main(unused_argv):
