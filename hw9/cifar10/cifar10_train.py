@@ -36,19 +36,23 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import os
 from datetime import datetime
 import time
 
 import tensorflow as tf
 
 import cifar10
+import cifar10_input
 
 FLAGS = tf.app.flags.FLAGS
 
 tf.app.flags.DEFINE_string('train_dir', '/tmp/cifar10_train',
                            """Directory where to write event logs """
                            """and checkpoint.""")
-tf.app.flags.DEFINE_integer('max_steps', 1000000,
+tf.app.flags.DEFINE_string('log_dir', os.path.join(os.getenv('TEST_TMPDIR', '/tmp'), 'tensorflow/cifar10/logs/'),
+                            """Summaries log directory.""")
+tf.app.flags.DEFINE_integer('max_steps', 4000,
                             """Number of batches to run.""")
 tf.app.flags.DEFINE_boolean('log_device_placement', False,
                             """Whether to log device placement.""")
@@ -60,19 +64,32 @@ def train():
   """Train CIFAR-10 for a number of steps."""
   with tf.Graph().as_default():
     global_step = tf.train.get_or_create_global_step()
+    summary_writer = tf.summary.FileWriter(FLAGS.log_dir)
 
     # Get images and labels for CIFAR-10.
     # Force input pipeline to CPU:0 to avoid operations sometimes ending up on
     # GPU and resulting in a slow down.
     with tf.device('/cpu:0'):
-      images, labels = cifar10.distorted_inputs()
+      train_images, train_labels = cifar10.distorted_inputs()
+      test_images, test_labels = cifar10_input.inputs(eval_data=True,
+                                                data_dir=os.path.join(FLAGS.data_dir, 'cifar-10-batches-bin'),
+                                                batch_size=10000)
 
+    test_image_shape = tf.shape(test_images)
     # Build a Graph that computes the logits predictions from the
     # inference model.
-    logits = cifar10.inference(images)
+    logits = cifar10.inference(train_images)
+    correct_prediction = tf.equal(tf.argmax(logits, 1), tf.cast(train_labels, tf.int64))
+    train_accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+
+    test_prediction = cifar10.inference(test_images)
+    correct_prediction = tf.equal(tf.argmax(test_prediction, 1), tf.cast(test_labels, tf.int64))
+    test_accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+    tf.summary.scalar('accuracy', test_accuracy)
+    summary_op = tf.summary.merge_all()
 
     # Calculate loss.
-    loss = cifar10.loss(logits, labels)
+    loss = cifar10.loss(logits, train_labels)
 
     # Build a Graph that trains the model with one batch of examples and
     # updates the model parameters.
@@ -112,8 +129,12 @@ def train():
         config=tf.ConfigProto(
             log_device_placement=FLAGS.log_device_placement)) as mon_sess:
       while not mon_sess.should_stop():
-        mon_sess.run(train_op)
-
+        step, _ = mon_sess.run([global_step, train_op])
+        if step % FLAGS.log_frequency == 0:
+          train_acc, test_acc, summary = mon_sess.run([train_accuracy, test_accuracy, summary_op])
+          print("Train Accuracy:%f Test Accuracy:%f"%(train_acc, test_acc))
+          summary_writer.add_summary(summary, step)
+          print(mon_sess.run(test_image_shape))
 
 def main(argv=None):  # pylint: disable=unused-argument
   cifar10.maybe_download_and_extract()

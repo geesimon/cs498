@@ -200,7 +200,7 @@ def inference(images):
   # by replacing all instances of tf.get_variable() with tf.Variable().
   #
   # conv1
-  with tf.variable_scope('conv1') as scope:
+  with tf.variable_scope('conv1', reuse=tf.AUTO_REUSE) as scope:
     kernel = _variable_with_weight_decay('weights',
                                          shape=[5, 5, 3, 64],
                                          stddev=5e-2,
@@ -219,7 +219,7 @@ def inference(images):
                     name='norm1')
 
   # conv2
-  with tf.variable_scope('conv2') as scope:
+  with tf.variable_scope('conv2', reuse=tf.AUTO_REUSE) as scope:
     kernel = _variable_with_weight_decay('weights',
                                          shape=[5, 5, 64, 64],
                                          stddev=5e-2,
@@ -238,7 +238,7 @@ def inference(images):
                          strides=[1, 2, 2, 1], padding='SAME', name='pool2')
 
   # local3
-  with tf.variable_scope('local3') as scope:
+  with tf.variable_scope('local3', reuse=tf.AUTO_REUSE) as scope:
     # Move everything into depth so we can perform a single matrix multiply.
     reshape = tf.reshape(pool2, [images.get_shape().as_list()[0], -1])
     dim = reshape.get_shape()[1].value
@@ -249,7 +249,7 @@ def inference(images):
     _activation_summary(local3)
 
   # local4
-  with tf.variable_scope('local4') as scope:
+  with tf.variable_scope('local4', reuse=tf.AUTO_REUSE) as scope:
     weights = _variable_with_weight_decay('weights', shape=[384, 192],
                                           stddev=0.04, wd=0.004)
     biases = _variable_on_cpu('biases', [192], tf.constant_initializer(0.1))
@@ -260,7 +260,7 @@ def inference(images):
   # We don't apply softmax here because
   # tf.nn.sparse_softmax_cross_entropy_with_logits accepts the unscaled logits
   # and performs the softmax internally for efficiency.
-  with tf.variable_scope('softmax_linear') as scope:
+  with tf.variable_scope('softmax_linear', reuse=tf.AUTO_REUSE) as scope:
     weights = _variable_with_weight_decay('weights', [192, NUM_CLASSES],
                                           stddev=1/192.0, wd=None)
     biases = _variable_on_cpu('biases', [NUM_CLASSES],

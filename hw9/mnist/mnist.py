@@ -32,7 +32,7 @@ def simple_model(inputs, keep_prob):
   dropped = tf.nn.dropout(hidden1, keep_prob)
   return tf.layers.dense(dropped, units=10, activation=tf.identity)
 
-def tutorial_model(inputs, keep_prob):
+def tutorial_model(inputs, keep_prob):  
   input_layer = tf.reshape(inputs, [-1, 28, 28, 1])
   conv1 = tf.layers.conv2d(
       inputs=input_layer,
