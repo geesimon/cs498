@@ -2,13 +2,30 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import argparse
 import os
-import sys
-
+import numpy as np
 import tensorflow as tf
 from tensorflow.examples.tutorials.mnist import input_data
 
+FLAGS = tf.app.flags.FLAGS
+tf.app.flags.DEFINE_integer('max_steps', 2000,
+                            """Number of batches to run.""")
+tf.app.flags.DEFINE_integer('batch_size', 100,
+                            """Number of images to process in a batch.""")
+tf.app.flags.DEFINE_integer('log_frequency', 100,
+                            """How often to log results to the console.""")
+tf.app.flags.DEFINE_float('dropout', 0.4,
+                            """Keep probability for training dropout.""")
+tf.app.flags.DEFINE_float('learning_rate', 0.001,
+                            """Initial learning rate.""")
+tf.app.flags.DEFINE_string('log_dir', os.path.join(os.getenv('TEST_TMPDIR', '/tmp'), 'tensorflow/mnist/logs/'),
+                            """Summaries log directory.""")
+tf.app.flags.DEFINE_string('data_dir', os.path.join(os.getenv('TEST_TMPDIR', '/tmp'), 'tensorflow/mnist/input_data'),
+                            """MNIST data directory.""")
+tf.app.flags.DEFINE_string('model_dir', os.path.join(os.getenv('TEST_TMPDIR', '/tmp'), 'tensorflow/mnist/model/'),
+                            """Model saving directory.""")
+tf.app.flags.DEFINE_string('model_name', "tutorial",
+                            """Specify model name for training.""")
 
 def simple_model(inputs, keep_prob):
   hidden1 = tf.layers.dense(inputs=inputs, units=500, activation=tf.nn.relu)
@@ -39,8 +56,41 @@ def tutorial_model(inputs, keep_prob):
 
   return tf.layers.dense(inputs=dropout, units=10)
 
-def train(model_name="tutorial"):
-  model_builder = {"tutorial":tutorial_model, "simple":simple_model}
+def enhance_model(inputs, keep_prob):
+  input_layer = tf.reshape(inputs, [-1, 28, 28, 1])
+  conv1 = tf.layers.conv2d(
+      inputs=input_layer,
+      filters=32,
+      kernel_size=[5, 5],
+      padding="same",
+      activation=tf.nn.relu)
+  pool1 = tf.layers.max_pooling2d(inputs=conv1, pool_size=[2, 2], strides=2)
+  conv2 = tf.layers.conv2d(
+      inputs=pool1,
+      filters=64,
+      kernel_size=[5, 5],
+      padding="same",
+      activation=tf.nn.relu)
+  pool2 = tf.layers.max_pooling2d(inputs=conv2, pool_size=[2, 2], strides=2)
+  pool2_flat = tf.reshape(pool2, [-1, 7 * 7 * 64])
+  dense = tf.layers.dense(inputs=pool2_flat, units=1024, activation=tf.nn.relu)
+
+  tf.summary.scalar('dropout_keep_probability', keep_prob)
+  dropout = tf.layers.dropout(inputs=dense, rate=keep_prob)
+
+  return tf.layers.dense(inputs=dropout, units=10)
+
+def train(model_name):
+  log_dir = FLAGS.log_dir + '/' + model_name
+  if tf.gfile.Exists(log_dir):
+    tf.gfile.DeleteRecursively(log_dir)
+
+  model_builder = {"tutorial":tutorial_model, "simple":simple_model,
+                  "enhance":enhance_model}
+  optimizer_builder = {"tutorial":tf.train.GradientDescentOptimizer, 
+                      "simple": tf.train.GradientDescentOptimizer,
+                      "enhance": tf.train.RMSPropOptimizer}
+
   mnist = input_data.read_data_sets(FLAGS.data_dir)
   sess = tf.InteractiveSession()
 
@@ -54,30 +104,24 @@ def train(model_name="tutorial"):
                     logits=logits))
   tf.summary.scalar('cross_entropy', cross_entropy)
 
-  train_step = tf.train.AdamOptimizer(FLAGS.learning_rate).minimize(cross_entropy)
+  train_step = optimizer_builder[model_name](FLAGS.learning_rate).minimize(cross_entropy)
   
-  with tf.name_scope('accuracy'):
-    with tf.name_scope('correct_prediction'):
-      correct_prediction = tf.equal(tf.argmax(logits, 1), targets_)
-    with tf.name_scope('accuracy'):
-      accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
-  
-  #accuracy = tf.metrics.accuracy(labels=targets_, predictions=tf.argmax(input=logits, axis=1))
+  correct_prediction = tf.equal(tf.argmax(logits, 1), targets_)
+  accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))  
   tf.summary.scalar('accuracy', accuracy)
 
   # Merge all the summaries and write them out to
-  # /tmp/tensorflow/mnist/logs/mnist_with_summaries (by default)
   merged = tf.summary.merge_all()
-  train_writer = tf.summary.FileWriter(FLAGS.log_dir + '/' + model_name + '/train', sess.graph)
-  test_writer = tf.summary.FileWriter(FLAGS.log_dir + '/' + model_name + '/test')
+  train_writer = tf.summary.FileWriter(log_dir + '/train', sess.graph)
+  test_writer = tf.summary.FileWriter(log_dir + '/test')
   tf.global_variables_initializer().run()
 
-  for i in range(FLAGS.max_steps):      
-    train_data, train_labels = mnist.train.next_batch(100, shuffle = True)
+  for i in range(FLAGS.max_steps + 1):      
+    train_data, train_labels = mnist.train.next_batch(FLAGS.batch_size, shuffle = True)
     train_dict = {inputs_:train_data, targets_:train_labels, keep_prob:FLAGS.dropout}
     test_dict = {inputs_:mnist.test.images, targets_:mnist.test.labels, keep_prob:1}
 
-    if i % 10 == 0:  # Record summaries and test-set accuracy
+    if i % FLAGS.log_frequency == 0:  # Record summaries and test-set accuracy
       run_options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
       run_metadata = tf.RunMetadata()
       loss, _ = sess.run([cross_entropy, train_step], feed_dict=train_dict,
@@ -96,36 +140,8 @@ def train(model_name="tutorial"):
   train_writer.close()
   test_writer.close()
 
-
 def main(unused_argv):
-  #if tf.gfile.Exists(FLAGS.log_dir):
-  #  tf.gfile.DeleteRecursively(FLAGS.log_dir)
-  #tf.gfile.MakeDirs(FLAGS.log_dir)
-
-  train(FLAGS.model)
+  train(FLAGS.model_name)
 
 if __name__ == "__main__":
-  parser = argparse.ArgumentParser()
-  parser.add_argument('--max_steps', type=int, default=2000,
-                      help='Number of steps to run trainer.')
-  parser.add_argument('--learning_rate', type=float, default=0.001,
-                      help='Initial learning rate')
-  parser.add_argument('--dropout', type=float, default=0.4,
-                      help='Keep probability for training dropout.')
-  parser.add_argument('--model', type=str, default="tutorial",
-                      help='Select model[tutorial, simple]')
-  parser.add_argument(
-      '--data_dir',
-      type=str,
-      default=os.path.join(os.getenv('TEST_TMPDIR', '/tmp'),
-                           'tensorflow/mnist/input_data'),
-      help='Directory for storing input data')
-  parser.add_argument(
-      '--log_dir',
-      type=str,
-      default=os.path.join(os.getenv('TEST_TMPDIR', '/tmp'),
-                           'tensorflow/mnist/logs/mnist'),
-      help='Summaries log directory')
-  FLAGS, unparsed = parser.parse_known_args()
-
-  tf.app.run(main=main, argv=[sys.argv[0]] + unparsed)
+  tf.app.run()

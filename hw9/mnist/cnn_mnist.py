@@ -22,10 +22,107 @@ import numpy as np
 import tensorflow as tf
 from tensorflow.examples.tutorials.mnist import input_data
 
+FLAGS = tf.app.flags.FLAGS
+tf.app.flags.DEFINE_integer('max_steps', 2000,
+                            """Number of batches to run.""")
+tf.app.flags.DEFINE_integer('batch_size', 100,
+                            """Number of images to process in a batch.""")
+tf.app.flags.DEFINE_integer('log_frequency', 100,
+                            """How often to log results to the console.""")
+tf.app.flags.DEFINE_float('dropout', 0.4,
+                            """Keep probability for training dropout.""")
+tf.app.flags.DEFINE_float('learning_rate', 0.001,
+                            """Initial learning rate.""")
+tf.app.flags.DEFINE_string('log_dir', os.path.join(os.getenv('TEST_TMPDIR', '/tmp'), 'tensorflow/mnist/logs/'),
+                            """Summaries log directory.""")
+tf.app.flags.DEFINE_string('data_dir', os.path.join(os.getenv('TEST_TMPDIR', '/tmp'), 'tensorflow/mnist/input_data'),
+                            """MNIST data directory.""")
+tf.app.flags.DEFINE_string('model_dir', os.path.join(os.getenv('TEST_TMPDIR', '/tmp'), 'tensorflow/mnist/model/'),
+                            """Model saving directory.""")
+tf.app.flags.DEFINE_string('model_name', "tutorial",
+                            """Specify model name for training.""")
+
 tf.logging.set_verbosity(tf.logging.INFO)
 
-
 def cnn_model_fn(features, labels, mode):
+  """Model function for CNN."""
+  # Input Layer
+  input_layer = tf.reshape(features["x"], [-1, 28, 28, 1])
+
+  # Convolutional Layer #1
+  conv1 = tf.layers.conv2d(
+      inputs=input_layer,
+      filters=32,
+      kernel_size=[5, 5],
+      padding="same",
+      activation=tf.nn.relu)
+
+  # Pooling Layer #1
+  pool1 = tf.layers.max_pooling2d(inputs=conv1, pool_size=[2, 2], strides=2)
+
+  # Convolutional Layer #2
+  conv2 = tf.layers.conv2d(
+      inputs=pool1,
+      filters=64,
+      kernel_size=[5, 5],
+      padding="same",
+      activation=tf.nn.relu)
+
+  # Pooling Layer #2
+  pool2 = tf.layers.max_pooling2d(inputs=conv2, pool_size=[2, 2], strides=2)
+
+  # Flatten tensor into a batch of vectors
+  pool2_flat = tf.reshape(pool2, [-1, 7 * 7 * 64])
+
+  # Dense Layer
+  dense = tf.layers.dense(inputs=pool2_flat, units=1024, activation=tf.nn.relu)
+
+  # Add dropout operation; 0.6 probability that element will be kept
+  dropout = tf.layers.dropout(
+      inputs=dense, rate=0.4, training=mode == tf.estimator.ModeKeys.TRAIN)
+
+  # Logits layer
+  logits = tf.layers.dense(inputs=dropout, units=10)
+
+  predictions = {
+      # Generate predictions (for PREDICT and EVAL mode)
+      "classes": tf.argmax(input=logits, axis=1),
+      # Add `softmax_tensor` to the graph. It is used for PREDICT and by the
+      # `logging_hook`.
+      "probabilities": tf.nn.softmax(logits, name="softmax_tensor"),
+  }
+  if mode == tf.estimator.ModeKeys.PREDICT:
+    return tf.estimator.EstimatorSpec(mode=mode, predictions=predictions)
+
+  # Calculate Loss (for both TRAIN and EVAL modes)
+  loss = tf.losses.sparse_softmax_cross_entropy(labels=labels, logits=logits)
+
+  # Configure the Training Op (for TRAIN mode)
+  if mode == tf.estimator.ModeKeys.TRAIN:
+    optimizer = tf.train.GradientDescentOptimizer(learning_rate=FLAGS.learning_rate)
+    train_op = optimizer.minimize(
+        loss=loss,
+        global_step=tf.train.get_global_step())
+    return tf.estimator.EstimatorSpec(mode=mode, loss=loss, train_op=train_op)
+
+  # Add evaluation metrics and summary (for EVAL mode)
+  correct_prediction = tf.equal(tf.argmax(logits, 1), tf.cast(labels,tf.int64))
+  accuracy_op = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+  
+  tf.summary.scalar('accuracy',accuracy_op)
+  summary_op = tf.summary.merge_all()
+
+  summary_hook = tf.train.SummarySaverHook(output_dir=FLAGS.log_dir + '/' + FLAGS.model_name, 
+                    summary_op=summary_op, save_steps=FLAGS.log_frequency)
+
+  eval_metric_ops = {
+      "accuracy": tf.metrics.accuracy(
+          labels=labels, predictions=predictions["classes"])}
+
+  return tf.estimator.EstimatorSpec(
+      mode=mode, loss=loss, eval_metric_ops=eval_metric_ops, evaluation_hooks=[summary_hook])
+
+def improve_model_fn(features, labels, mode):
   """Model function for CNN."""
   # Input Layer
   # Reshape X to 4-D tensor: [batch_size, width, height, channels]
@@ -94,7 +191,6 @@ def cnn_model_fn(features, labels, mode):
       # Add `softmax_tensor` to the graph. It is used for PREDICT and by the
       # `logging_hook`.
       "probabilities": tf.nn.softmax(logits, name="softmax_tensor"),
-      "accuracy":  tf.reduce_mean(tf.cast(tf.equal(tf.argmax(logits, 1, output_type = tf.int32), labels), tf.float32), name="accuracy")
   }
   if mode == tf.estimator.ModeKeys.PREDICT:
     return tf.estimator.EstimatorSpec(mode=mode, predictions=predictions)
@@ -104,25 +200,36 @@ def cnn_model_fn(features, labels, mode):
 
   # Configure the Training Op (for TRAIN mode)
   if mode == tf.estimator.ModeKeys.TRAIN:
-    optimizer = tf.train.GradientDescentOptimizer(learning_rate=0.001)
+    optimizer = tf.train.RMSPropOptimizer(learning_rate=FLAGS.learning_rate)
     train_op = optimizer.minimize(
         loss=loss,
         global_step=tf.train.get_global_step())
     return tf.estimator.EstimatorSpec(mode=mode, loss=loss, train_op=train_op)
 
-  # Add evaluation metrics (for EVAL mode)
+  # Add evaluation metrics and summary (for EVAL mode)
+  correct_prediction = tf.equal(tf.argmax(logits, 1), tf.cast(labels,tf.int64))
+  accuracy_op = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+  
+  tf.summary.scalar('accuracy',accuracy_op)
+  summary_op = tf.summary.merge_all()
+
+  summary_hook = tf.train.SummarySaverHook(output_dir=FLAGS.log_dir + '/' + FLAGS.model_name, 
+                    summary_op=summary_op, save_steps=FLAGS.log_frequency)
+
   eval_metric_ops = {
       "accuracy": tf.metrics.accuracy(
           labels=labels, predictions=predictions["classes"])}
-  return tf.estimator.EstimatorSpec(
-      mode=mode, loss=loss, eval_metric_ops=eval_metric_ops)
 
+  return tf.estimator.EstimatorSpec(
+      mode=mode, loss=loss, eval_metric_ops=eval_metric_ops, evaluation_hooks=[summary_hook])
+
+
+
+model_fun = {"tutorial":cnn_model_fn, "improve":improve_model_fn}
 
 def main(unused_argv):
   # Load training and eval data
-  data_path = os.path.join(os.getenv('TEST_TMPDIR', '/tmp'),
-                           'tensorflow/mnist/input_data'),
-  mnist = input_data.read_data_sets("/tmp/tensorflow/mnist/input_data")
+  mnist = input_data.read_data_sets(FLAGS.data_dir)
   #mnist = tf.contrib.learn.datasets.load_dataset("mnist")
   train_data = mnist.train.images  # Returns np.array
   train_labels = np.asarray(mnist.train.labels, dtype=np.int32)
@@ -131,14 +238,8 @@ def main(unused_argv):
 
   # Create the Estimator
   mnist_classifier = tf.estimator.Estimator(
-      model_fn=cnn_model_fn, model_dir="/tmp/mnist_convnet_model")
-
-  # Set up logging for predictions
-  # Log the values in the "Softmax" tensor with label "probabilities"
-  #tensors_to_log = {"probabilities": "softmax_tensor"}
-  tensors_to_log = {"accuracy":"accuracy"}
-  logging_hook = tf.train.LoggingTensorHook(
-      tensors=tensors_to_log, every_n_iter=100)
+      model_fn=model_fun[FLAGS.model_name], 
+      model_dir=FLAGS.model_dir + '/' + FLAGS.model_name)
 
   # Train the model
   train_input_fn = tf.estimator.inputs.numpy_input_fn(
@@ -147,19 +248,21 @@ def main(unused_argv):
       batch_size=100,
       num_epochs=None,
       shuffle=True)
-  mnist_classifier.train(
-      input_fn=train_input_fn,
-      steps=2000,
-      hooks=[logging_hook])
-
-  # Evaluate the model and print results
+  
   eval_input_fn = tf.estimator.inputs.numpy_input_fn(
       x={"x": eval_data},
       y=eval_labels,
       num_epochs=1,
       shuffle=False)
-  eval_results = mnist_classifier.evaluate(input_fn=eval_input_fn)
-  print(eval_results)
+
+  for i in range(FLAGS.max_steps // FLAGS.log_frequency):
+    mnist_classifier.train(
+        input_fn=train_input_fn,
+        steps=FLAGS.log_frequency)
+
+    # Evaluate the model and print results
+    eval_results = mnist_classifier.evaluate(input_fn=eval_input_fn)
+    print(eval_results)        
 
 
 if __name__ == "__main__":
