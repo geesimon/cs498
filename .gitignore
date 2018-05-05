@@ -8,3 +8,5 @@ MNIST-data/
 MNIST_data/
 hw8/mnist/
 __pycache__/
+flower_photos/
+vgg16.npy
