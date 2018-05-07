@@ -112,7 +112,7 @@ def train(model_name):
 
   # Merge all the summaries and write them out to
   merged = tf.summary.merge_all()
-  train_writer = tf.summary.FileWriter(log_dir + '/train', sess.graph)
+  #train_writer = tf.summary.FileWriter(log_dir + '/train', sess.graph)
   test_writer = tf.summary.FileWriter(log_dir + '/test')
   tf.global_variables_initializer().run()
 
@@ -126,18 +126,15 @@ def train(model_name):
       run_metadata = tf.RunMetadata()
       loss, _ = sess.run([cross_entropy, train_step], feed_dict=train_dict,
                         options=run_options, run_metadata=run_metadata)
-      train_writer.add_run_metadata(run_metadata, 'step%03d' % i)
+      test_writer.add_run_metadata(run_metadata, 'step%03d' % i)
       
-      summary, acc_train = sess.run([merged, accuracy], feed_dict=train_dict)
-      train_writer.add_summary(summary, i)
-
-      summary, acc_test = sess.run([merged, accuracy], feed_dict=test_dict)
+      summary, test_acc = sess.run([merged, accuracy], feed_dict=test_dict)
       test_writer.add_summary(summary, i)
-      print('Accuracy at step %s: %s,%s Loss %s' % (i, acc_train, acc_test, loss))
+      print('Test Accuracy at Step %4d: %f Loss %f' % (i, test_acc, loss))
     else:
       sess.run([train_step], feed_dict=train_dict)
 
-  train_writer.close()
+  #train_writer.close()
   test_writer.close()
 
 def main(unused_argv):
