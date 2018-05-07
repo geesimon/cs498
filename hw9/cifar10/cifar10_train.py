@@ -40,6 +40,7 @@ import os
 from datetime import datetime
 import time
 
+import numpy as np
 import tensorflow as tf
 
 import cifar10
@@ -50,7 +51,7 @@ FLAGS = tf.app.flags.FLAGS
 tf.app.flags.DEFINE_string('train_dir', '/tmp/cifar10_train',
                            """Directory where to write event logs """
                            """and checkpoint.""")
-tf.app.flags.DEFINE_string('log_dir', os.path.join(os.getenv('TEST_TMPDIR', '/tmp'), 'tensorflow/cifar10/logs/'),
+tf.app.flags.DEFINE_string('log_dir', os.path.join(os.getenv('TEST_TMPDIR', '/tmp'), 'tensorflow/cifar10/logs/tutorial'),
                             """Summaries log directory.""")
 tf.app.flags.DEFINE_integer('max_steps', 4000,
                             """Number of batches to run.""")
@@ -58,6 +59,21 @@ tf.app.flags.DEFINE_boolean('log_device_placement', False,
                             """Whether to log device placement.""")
 tf.app.flags.DEFINE_integer('log_frequency', 100,
                             """How often to log results to the console.""")
+
+
+EVALUATE_BATCH_SIZE = 1000
+def evaluate(session, correct_prediction):
+  total_count = 0
+  total_correct_count = 0
+
+  for i in range(cifar10_input.NUM_EXAMPLES_PER_EPOCH_FOR_EVAL // EVALUATE_BATCH_SIZE):
+    correct_count = np.sum(session.run([correct_prediction]))
+    total_correct_count += correct_count
+    total_count += EVALUATE_BATCH_SIZE
+  
+  accuracy = total_correct_count / total_count
+
+  return accuracy
 
 
 def train():
@@ -73,17 +89,15 @@ def train():
       train_images, train_labels = cifar10.distorted_inputs()
       test_images, test_labels = cifar10_input.inputs(eval_data=True,
                                                 data_dir=os.path.join(FLAGS.data_dir, 'cifar-10-batches-bin'),
-                                                batch_size=10000)
+                                                batch_size=cifar10_input.NUM_EXAMPLES_PER_EPOCH_FOR_EVAL)
+      #test_images, test_labels = cifar10.inputs(True)
 
-    test_image_shape = tf.shape(test_images)
     # Build a Graph that computes the logits predictions from the
     # inference model.
     logits = cifar10.inference(train_images)
-    correct_prediction = tf.equal(tf.argmax(logits, 1), tf.cast(train_labels, tf.int64))
-    train_accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
 
-    test_prediction = cifar10.inference(test_images)
-    correct_prediction = tf.equal(tf.argmax(test_prediction, 1), tf.cast(test_labels, tf.int64))
+    prediction = cifar10.inference(test_images)
+    correct_prediction = tf.equal(tf.argmax(prediction, 1), tf.cast(test_labels, tf.int64))
     test_accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
     tf.summary.scalar('accuracy', test_accuracy)
     summary_op = tf.summary.merge_all()
@@ -121,20 +135,23 @@ def train():
           print (format_str % (datetime.now(), self._step, loss_value,
                                examples_per_sec, sec_per_batch))
 
+
     with tf.train.MonitoredTrainingSession(
-        checkpoint_dir=FLAGS.train_dir,
         hooks=[tf.train.StopAtStepHook(last_step=FLAGS.max_steps),
-               tf.train.NanTensorHook(loss),
-               _LoggerHook()],
+               tf.train.NanTensorHook(loss)],
         config=tf.ConfigProto(
-            log_device_placement=FLAGS.log_device_placement)) as mon_sess:
-      while not mon_sess.should_stop():
-        step, _ = mon_sess.run([global_step, train_op])
+            log_device_placement=FLAGS.log_device_placement)) as sess:
+    #with tf.Session() as sess:
+    #  for step in range(FLAGS.max_steps):
+      while not sess.should_stop():
+        step, _ = sess.run([global_step, train_op])
         if step % FLAGS.log_frequency == 0:
-          train_acc, test_acc, summary = mon_sess.run([train_accuracy, test_accuracy, summary_op])
-          print("Train Accuracy:%f Test Accuracy:%f"%(train_acc, test_acc))
+          test_acc, summary = sess.run([test_accuracy, summary_op])
+          #test_acc = evaluate(sess, test_correct_prediction)
+          print("Step:%4d Test Accuracy:%f"%(step, test_acc))
           summary_writer.add_summary(summary, step)
-          print(mon_sess.run(test_image_shape))
+
+    summary_writer.close()
 
 def main(argv=None):  # pylint: disable=unused-argument
   cifar10.maybe_download_and_extract()
