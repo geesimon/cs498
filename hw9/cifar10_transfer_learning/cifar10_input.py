@@ -57,7 +57,6 @@ def read_cifar10(filename_queue):
       uint8image: a [height, width, depth] uint8 Tensor with the image data
   """
 
-  print(filename_queue)
   class CIFAR10Record(object):
     pass
   result = CIFAR10Record()
