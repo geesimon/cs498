@@ -79,8 +79,10 @@ def avg_pool_layer(bottom, name):
 def max_pool_layer(bottom, name):
     return tf.nn.max_pool(bottom, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME', name=name)
 
-def norm_layer(bottom, name):
-    return tf.nn.lrn(bottom, 4, bias=1.0, alpha=0.001 / 9.0, beta=0.75, name=name)
+def batch_norm_layer(bottom, name):
+    return bottom
+    #return tf.layers.batch_normalization(bottom, name=name)
+    #return tf.nn.lrn(bottom, 4, bias=1.0, alpha=0.001 / 9.0, beta=0.75, name=name)
 
 def dropout_layer(bottom, keep_prob, name):
     return tf.nn.dropout(bottom, keep_prob, name=name)
@@ -111,34 +113,53 @@ def fc_layer(bottom, unit_num, name):
 
 def build_vgg_model(images):
     conv1_1     = conv_layer(images,  (3, 3), 64, name="conv1_1")
-    norm1_1     = norm_layer(conv1_1, name="norm1_1")
+    norm1_1     = batch_norm_layer(conv1_1, name="norm1_1")
     dropout1_1  = dropout_layer(norm1_1, 0.3, name="dropout1_1")
     conv1_2     = conv_layer(dropout1_1,  (3, 3), 64, "conv1_2")
-    norm1_2     = norm_layer(conv1_2, name="norm1_2")
+    norm1_2     = batch_norm_layer(conv1_2, name="norm1_2")
     pool1       = max_pool_layer(norm1_2, name="pool1")
     
     conv2_1     = conv_layer(pool1,  (3, 3), 128, name="conv2_1")
-    norm2_1     = norm_layer(conv2_1, name="norm2_1")
+    norm2_1     = batch_norm_layer(conv2_1, name="norm2_1")
     dropout2_1  = dropout_layer(norm2_1, 0.4, name="dropout2_1")
     conv2_2     = conv_layer(dropout2_1,  (3, 3), 128, name="conv2_2")
-    norm2_2     = norm_layer(conv2_2, name="norm2_2")
+    norm2_2     = batch_norm_layer(conv2_2, name="norm2_2")
     pool2       = max_pool_layer(norm2_2, name="pool2")
 
     conv3_1     = conv_layer(pool2,  (3, 3), 256, name="conv3_1")
-    norm3_1     = norm_layer(conv3_1, name="norm3_1")
+    norm3_1     = batch_norm_layer(conv3_1, name="norm3_1")
     dropout3_1  = dropout_layer(norm3_1, 0.4, name="dropout3_1")
     conv3_2     = conv_layer(dropout3_1,  (3, 3), 256, name="conv3_2")
-    norm3_2     = norm_layer(conv3_2, name="norm3_2")
+    norm3_2     = batch_norm_layer(conv3_2, name="norm3_2")
     dropout3_2  = dropout_layer(norm3_2, 0.4, name="dropout3_2")
-    conv3_3     = conv_layer(dropout3_2,  (3, 3), 256, name="conv3_2")
-    norm3_3     = norm_layer(conv3_3, name="norm3_3")
+    conv3_3     = conv_layer(dropout3_2,  (3, 3), 256, name="conv3_3")
+    norm3_3     = batch_norm_layer(conv3_3, name="norm3_3")
     pool3       = max_pool_layer(norm3_3, name="pool3")
 
-    dropout5    = dropout_layer(pool3, 0.5, name="dropout5")
+    conv4_1     = conv_layer(pool3,  (3, 3), 512, name="conv4_1")
+    norm4_1     = batch_norm_layer(conv4_1, name="norm4_1")
+    dropout4_1  = dropout_layer(norm4_1, 0.4, name="dropout4_1")
+    conv4_2     = conv_layer(dropout4_1,  (3, 3), 512, name="conv4_2")
+    norm4_2     = batch_norm_layer(conv4_2, name="norm4_2")
+    dropout4_2  = dropout_layer(norm4_2, 0.4, name="dropout4_2")
+    conv4_3     = conv_layer(dropout4_2,  (3, 3), 512, name="conv4_3")
+    norm4_3     = batch_norm_layer(conv4_3, name="norm4_3")
+    pool4       = max_pool_layer(norm4_3, name="pool4")
+
+    conv5_1     = conv_layer(pool3,  (3, 3), 512, name="conv5_1")
+    norm5_1     = batch_norm_layer(conv5_1, name="norm5_1")
+    dropout5_1  = dropout_layer(norm5_1, 0.4, name="dropout5_1")
+    conv5_2     = conv_layer(dropout5_1,  (3, 3), 512, name="conv5_2")
+    norm5_2     = batch_norm_layer(conv5_2, name="norm5_2")
+    dropout5_2  = dropout_layer(norm5_2, 0.4, name="dropout5_2")
+    conv5_3     = conv_layer(dropout5_2,  (3, 3), 512, name="conv5_3")
+    norm5_3     = batch_norm_layer(conv5_3, name="norm5_3")
+    pool5       = max_pool_layer(norm5_3, name="pool5")
+    dropout5    = dropout_layer(pool5, 0.5, name="dropout5")
 
     fc6         = fc_layer(dropout5, 512, name="fc6")
-    #norm6_1     = norm_layer(fc6, name="norm6_1")
-    dropout6_1  = dropout_layer(fc6, 0.5, name="dropout6_1")
+    norm6_1     = batch_norm_layer(fc6, name="norm6_1")
+    dropout6_1  = dropout_layer(norm6_1, 0.5, name="dropout6_1")
 
     fc7         = fc_layer(dropout6_1, NUM_CLASSES, name="fc7")
 

@@ -27,7 +27,7 @@ import tensorflow as tf
 # Process images of this size. Note that this differs from the original CIFAR
 # image size of 32 x 32. If one alters this number, then the entire model
 # architecture will change and any model would need to be retrained.
-IMAGE_SIZE = 24
+IMAGE_SIZE = 32
 
 # Global constants describing the CIFAR-10 data set.
 NUM_CLASSES = 10
@@ -169,11 +169,11 @@ def distorted_inputs(data_dir, batch_size):
     # distortions applied to the image.
 
     # Resize image
-    resized_image = tf.image.resize_images(reshaped_image, [height, width],
-                                          method = tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+    #resized_image = tf.image.resize_images(reshaped_image, [height, width],
+    #                                      method = tf.image.ResizeMethod.NEAREST_NEIGHBOR)
     
     # Randomly crop a [height, width] section of the image.
-    distorted_image = tf.random_crop(resized_image, [height, width, 3])
+    distorted_image = tf.random_crop(reshaped_image, [height, width, 3])
 
     # Randomly flip the image horizontally.
     distorted_image = tf.image.random_flip_left_right(distorted_image)
@@ -246,11 +246,11 @@ def inputs(eval_data, data_dir, batch_size):
     # Crop the central [height, width] of the image.
     #resized_image = tf.image.resize_image_with_crop_or_pad(reshaped_image,
     #                                                       height, width)
-    resized_image = tf.image.resize_images(reshaped_image, [height, width],
-                                          method = tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+    #resized_image = tf.image.resize_images(reshaped_image, [height, width],
+    #                                      method = tf.image.ResizeMethod.NEAREST_NEIGHBOR)
 
     # Subtract off the mean and divide by the variance of the pixels.
-    float_image = tf.image.per_image_standardization(resized_image)
+    float_image = tf.image.per_image_standardization(reshaped_image)
 
     # Set the shapes of tensors.
     float_image.set_shape([height, width, 3])
