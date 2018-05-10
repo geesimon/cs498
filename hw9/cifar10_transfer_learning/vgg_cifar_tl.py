@@ -57,6 +57,7 @@ def build_code(data_dir, eval_data, sample_count, batch_size = 100):
 def may_load_test_code(data_dir):
     test_filenames = [os.path.join(data_dir, 'test_codes.npy'), os.path.join(data_dir,'test_labels.npy')]
 
+    #ReBuild test code files if necessary
     if os.path.isfile(test_filenames[0]) and os.path.isfile(test_filenames[1]):
         test_codes = np.load(test_filenames[0])
         test_labels = np.load(test_filenames[1])
@@ -70,6 +71,7 @@ def may_load_test_code(data_dir):
 def train():
     vgg = Vgg16()
 
+    #Test images for VGG only need to be loaded once
     test_codes, test_labels = may_load_test_code(FLAGS.data_dir)
 
     with tf.Graph().as_default():
