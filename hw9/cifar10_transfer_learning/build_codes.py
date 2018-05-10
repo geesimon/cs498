@@ -7,7 +7,7 @@ import cifar10_input
 from tensorflow_vgg.vgg16 import Vgg16
 
 
-BATCH_SIZE  = 100
+BATCH_SIZE  = 10
 DATA_DIR = "/tmp/cifar10_data/cifar-10-batches-bin"
 
 def build_code(data_dir, eval_data, sample_count, batch_size = 100):
