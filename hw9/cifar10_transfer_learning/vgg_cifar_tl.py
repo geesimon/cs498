@@ -23,7 +23,8 @@ tf.app.flags.DEFINE_integer('batch_size', 100,
 
 def cifar_model(vgg_codes):
     dense = tf.layers.dense(inputs=vgg_codes, units=512, activation=tf.nn.relu)
-    dropout = tf.layers.dropout(inputs=dense, rate=0.4)
+    dense_nom = tf.layers.batch_normalization(dense)
+    dropout = tf.layers.dropout(inputs=dense_nom, rate=0.5)
     logits = tf.layers.dense(dropout, 10, activation=None)
 
     return logits
@@ -33,10 +34,8 @@ def build_code(data_dir, eval_data, sample_count, batch_size = 100):
     with tf.Graph().as_default():
         #global_step = tf.train.get_or_create_global_step()
         with tf.device('/cpu:0'):  #Make use of CPU memory to reduce GPU memory usage
-            #images, labels = cifar10_input.inputs(eval_data=eval_data,
-            #                                    data_dir=data_dir,
-            #                                    batch_size=batch_size)
-            images, labels = cifar10_input.distorted_inputs(data_dir=data_dir,
+            images, labels = cifar10_input.inputs(eval_data=eval_data,
+                                                data_dir=data_dir,
                                                 batch_size=batch_size)
 
         vgg.build(images)
@@ -77,8 +76,10 @@ def train():
         #global_step = tf.train.get_or_create_global_step()
         #Make use of CPU memory to avoid GPU memory allocation problem
         with tf.device('/cpu:0'):  
-            images, labels = cifar10_input.inputs(eval_data=False,
-                                                data_dir=FLAGS.data_dir,
+            #images, labels = cifar10_input.inputs(eval_data=False,
+            #                                    data_dir=FLAGS.data_dir,
+            #                                    batch_size=FLAGS.batch_size)
+            images, labels = cifar10_input.distorted_inputs(data_dir=FLAGS.data_dir,
                                                 batch_size=FLAGS.batch_size)
 
         vgg.build(images)
@@ -102,7 +103,7 @@ def train():
         summary_writer = tf.summary.FileWriter(FLAGS.log_dir)
         test_dict = {input_:test_codes, labels_:test_labels}
         with tf.train.MonitoredSession() as sess:
-            for i in range(FLAGS.max_steps):
+            for i in range(FLAGS.max_steps + 1):
                 labels_batch, codes_batch = sess.run([labels, vgg.relu6])                
                 train_dict = {input_:codes_batch, labels_:labels_batch}
                 _, loss_val = sess.run([train_step, cross_entropy], feed_dict=train_dict)
