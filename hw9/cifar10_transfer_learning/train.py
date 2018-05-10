@@ -52,8 +52,8 @@ vgg16_dataset = CIFAR10_VGG16_Code()
 inputs_ = tf.placeholder(tf.float64, shape=[None, vgg16_dataset.train_codes.shape[1]], name = 'x-input')
 labels_ = tf.placeholder(tf.int32, [None], name='y-input')
 
-
-dense = tf.layers.dense(inputs=inputs_, units=1024, activation=tf.nn.relu)
+dense = tf.contrib.layers.fully_connected(inputs_, 1024)
+#dense = tf.layers.dense(inputs=inputs_, units=1024, activation=tf.nn.relu)
 dropout = tf.layers.dropout(inputs=dense, rate=keep_prob)
 logits = tf.layers.dense(dropout, 10, activation=None)
 
@@ -67,7 +67,7 @@ correct_pred = tf.equal(tf.argmax(predicted, 1), tf.argmax(labels_, 1))
 accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
 
 with tf.Session() as sess:
-    tf.global_variables_initializer().run()
+    sess.run(tf.global_variables_initializer())
     for i in range(max_steps + 1):
         train_codes, train_labels = vgg16_dataset.next_batch()
         train_dict = {inputs_:train_codes, labels_:train_labels}
