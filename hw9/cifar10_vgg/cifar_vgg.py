@@ -16,7 +16,8 @@ tf.app.flags.DEFINE_integer('log_frequency', 100,
                             """How often to log results to the console.""")
 tf.app.flags.DEFINE_integer('batch_size', 100,
                             """Number of images to process in a batch.""")
-
+tf.app.flags.DEFINE_boolean('use_fp16', False,
+                            """Train the model using fp16.""")
 
 NUM_CLASSES = cifar10_input.NUM_CLASSES
 NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN = cifar10_input.NUM_EXAMPLES_PER_EPOCH_FOR_TRAIN
@@ -30,47 +31,47 @@ LEARNING_RATE_DECAY_FACTOR = 0.1  # Learning rate decay factor.
 INITIAL_LEARNING_RATE = 0.1       # Initial learning rate.
 
 def _variable_on_cpu(name, shape, initializer):
-  """Helper to create a Variable stored on CPU memory.
+    """Helper to create a Variable stored on CPU memory.
 
-  Args:
-    name: name of the variable
-    shape: list of ints
-    initializer: initializer for Variable
+    Args:
+        name: name of the variable
+        shape: list of ints
+        initializer: initializer for Variable
 
-  Returns:
-    Variable Tensor
-  """
-  with tf.device('/cpu:0'):
-    dtype = tf.float16 if FLAGS.use_fp16 else tf.float32
-    var = tf.get_variable(name, shape, initializer=initializer, dtype=dtype)
-  return var
+    Returns:
+        Variable Tensor
+    """
+    with tf.device('/cpu:0'):
+        dtype = tf.float16 if FLAGS.use_fp16 else tf.float32
+        var = tf.get_variable(name, shape, initializer=initializer, dtype=dtype)
+    return var
 
 
 def _variable_with_weight_decay(name, shape, stddev, wd):
-  """Helper to create an initialized Variable with weight decay.
+    """Helper to create an initialized Variable with weight decay.
 
-  Note that the Variable is initialized with a truncated normal distribution.
-  A weight decay is added only if one is specified.
+    Note that the Variable is initialized with a truncated normal distribution.
+    A weight decay is added only if one is specified.
 
-  Args:
-    name: name of the variable
-    shape: list of ints
-    stddev: standard deviation of a truncated Gaussian
-    wd: add L2Loss weight decay multiplied by this float. If None, weight
-        decay is not added for this Variable.
+    Args:
+        name: name of the variable
+        shape: list of ints
+        stddev: standard deviation of a truncated Gaussian
+        wd: add L2Loss weight decay multiplied by this float. If None, weight
+            decay is not added for this Variable.
 
-  Returns:
-    Variable Tensor
-  """
-  dtype = tf.float16 if FLAGS.use_fp16 else tf.float32
-  var = _variable_on_cpu(
-      name,
-      shape,
-      tf.truncated_normal_initializer(stddev=stddev, dtype=dtype))
-  if wd is not None:
-    weight_decay = tf.multiply(tf.nn.l2_loss(var), wd, name='weight_loss')
-    tf.add_to_collection('losses', weight_decay)
-  return var
+    Returns:
+        Variable Tensor
+    """
+    dtype = tf.float16 if FLAGS.use_fp16 else tf.float32
+    var = _variable_on_cpu(
+        name,
+        shape,
+        tf.truncated_normal_initializer(stddev=stddev, dtype=dtype))
+    if wd is not None:
+        weight_decay = tf.multiply(tf.nn.l2_loss(var), wd, name='weight_loss')
+        tf.add_to_collection('losses', weight_decay)
+    return var
 
 def avg_pool_layer(bottom, name):
     return tf.nn.avg_pool(bottom, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAME', name=name)
@@ -101,7 +102,7 @@ def fc_layer(bottom, unit_num, name):
         dim = 1
         for d in shape[1:]:
             dim *= d
-        reshape = tf.reshape(bottom, [dim, -1])
+        reshape = tf.reshape(bottom, [-1, dim])
         weights = _variable_with_weight_decay('weights', shape=[dim, unit_num],
                                             stddev=0.04, wd=0.004)
         biases = _variable_on_cpu('biases', [unit_num], tf.constant_initializer(0.1))
@@ -136,8 +137,8 @@ def build_vgg_model(images):
     dropout5    = dropout_layer(pool3, 0.5, name="dropout5")
 
     fc6         = fc_layer(dropout5, 512, name="fc6")
-    norm6_1     = norm_layer(fc6, name="norm6_1")    
-    dropout6_1  = dropout_layer(norm6_1, 0.5, name="dropout6_1")
+    #norm6_1     = norm_layer(fc6, name="norm6_1")
+    dropout6_1  = dropout_layer(fc6, 0.5, name="dropout6_1")
 
     fc7         = fc_layer(dropout6_1, NUM_CLASSES, name="fc7")
 
