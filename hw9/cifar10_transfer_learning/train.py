@@ -2,7 +2,7 @@ import os
 import tensorflow as tf
 import numpy as np
 
-max_steps = 20000
+max_steps = 2000
 batch_size = 1000
 keep_prob = 0.4
 
@@ -47,45 +47,25 @@ class CIFAR10_VGG16_Code:
                 
         return (batch_codes, batch_labels)
 
-    def test_data(self):
-        return (self.test_codes, self.test_labels)
-
 vgg16_dataset = CIFAR10_VGG16_Code()
 
-with tf.Graph().as_default():
-    with tf.device('/cpu:0'):
-        inputs_ = tf.placeholder(tf.float64, shape=[None, vgg16_dataset.train_codes.shape[1]], name = 'x-input')
-        labels_ = tf.placeholder(tf.int32, [None], name='y-input')
+inputs_ = tf.placeholder(tf.float64, shape=[None, vgg16_dataset.train_codes.shape[1]], name = 'x-input')
+labels_ = tf.placeholder(tf.int32, [None], name='y-input')
 
-<<<<<<< HEAD
-dense = tf.contrib.layers.fully_connected(inputs_, 1024)
-#dense = tf.layers.dense(inputs=inputs_, units=1024, activation=tf.nn.relu)
+
+dense = tf.layers.dense(inputs=inputs_, units=1024, activation=tf.nn.relu)
 dropout = tf.layers.dropout(inputs=dense, rate=keep_prob)
 logits = tf.layers.dense(dropout, 10, activation=None)
-=======
-    #fc = tf.contrib.layers.fully_connected(inputs_, 256)
-    #logits = tf.contrib.layers.fully_connected(fc, 10, activation_fn=None)
-    dense = tf.layers.dense(inputs=inputs_, units=512, activation=tf.nn.relu)
-    dropout = tf.layers.dropout(inputs=dense, rate=keep_prob)
-    logits = tf.layers.dense(dropout, 10, activation=None)
 
-    cross_entropy = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=labels_, 
-                        logits=logits))
->>>>>>> 67d9908100271c48df3aa50ee9037564c3faeaba
+cross_entropy = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=labels_, 
+                    logits=logits))
 
-    train_step = tf.train.AdamOptimizer().minimize(cross_entropy)
+train_step = tf.train.AdamOptimizer().minimize(cross_entropy)
 
-    correct_prediction = tf.equal(tf.argmax(logits, 1), tf.cast(labels_, tf.int64))
-    accuracy = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+predicted = tf.nn.softmax(logits)
+correct_pred = tf.equal(tf.argmax(predicted, 1), tf.argmax(labels_, 1))
+accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
 
-    with tf.Session() as sess:
-        tf.global_variables_initializer().run()
-        test_dict = {inputs_:vgg16_dataset.test_codes, labels_:vgg16_dataset.test_labels}
-        for i in range(max_steps + 1):
-            train_codes, train_labels = vgg16_dataset.next_batch()
-            train_dict = {inputs_:train_codes, labels_:train_labels}
-
-<<<<<<< HEAD
 with tf.Session() as sess:
     sess.run(tf.global_variables_initializer())
     for i in range(max_steps + 1):
@@ -93,10 +73,6 @@ with tf.Session() as sess:
         train_dict = {inputs_:train_codes, labels_:train_labels}
         #test_dict = {inputs_:mnist.test.images, targets_:mnist.test.labels, keep_prob:1}
         _, loss_val = sess.run([train_step, cross_entropy], feed_dict=train_dict)
-=======
-            _, loss_val = sess.run([train_step, cross_entropy], feed_dict=train_dict)
->>>>>>> 67d9908100271c48df3aa50ee9037564c3faeaba
 
-            if i % 100 == 0:
-                acc = sess.run(accuracy, feed_dict=test_dict)
-                print("Step %3d: Accuracy:%f"%(i, acc))
+        if i % 100 == 0:
+            print(loss_val)
