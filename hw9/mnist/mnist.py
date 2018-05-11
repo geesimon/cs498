@@ -49,9 +49,8 @@ def tutorial_model(inputs, keep_prob):
       activation=tf.nn.relu)
   pool2 = tf.layers.max_pooling2d(inputs=conv2, pool_size=[2, 2], strides=2)
   pool2_flat = tf.reshape(pool2, [-1, 7 * 7 * 64])
+  
   dense = tf.layers.dense(inputs=pool2_flat, units=1024, activation=tf.nn.relu)
-
-  tf.summary.scalar('dropout_keep_probability', keep_prob)
   dropout = tf.layers.dropout(inputs=dense, rate=keep_prob)
 
   return tf.layers.dense(inputs=dropout, units=10)
@@ -60,22 +59,33 @@ def enhance_model(inputs, keep_prob):
   input_layer = tf.reshape(inputs, [-1, 28, 28, 1])
   conv1 = tf.layers.conv2d(
       inputs=input_layer,
-      filters=32,
-      kernel_size=[5, 5],
+      filters=8,
+      kernel_size=[3, 3],
       padding="same",
       activation=tf.nn.relu)
-  pool1 = tf.layers.max_pooling2d(inputs=conv1, pool_size=[2, 2], strides=2)
+  norm1 = tf.layers.batch_normalization(conv1)
+  pool1 = tf.layers.max_pooling2d(inputs=norm1, pool_size=[2, 2], strides=2)
+
   conv2 = tf.layers.conv2d(
       inputs=pool1,
-      filters=64,
-      kernel_size=[5, 5],
+      filters=32,
+      kernel_size=[3, 3],
       padding="same",
       activation=tf.nn.relu)
-  pool2 = tf.layers.max_pooling2d(inputs=conv2, pool_size=[2, 2], strides=2)
-  pool2_flat = tf.reshape(pool2, [-1, 7 * 7 * 64])
-  dense = tf.layers.dense(inputs=pool2_flat, units=1024, activation=tf.nn.relu)
+  norm2 = tf.layers.batch_normalization(conv2)
+  pool2 = tf.layers.max_pooling2d(inputs=norm2, pool_size=[2, 2], strides=2)
 
-  tf.summary.scalar('dropout_keep_probability', keep_prob)
+  conv3 = tf.layers.conv2d(
+      inputs=pool2,
+      filters=64,
+      kernel_size=[3, 3],
+      padding="same",
+      activation=tf.nn.relu)
+  norm3 = tf.layers.batch_normalization(conv3)
+  pool3 = tf.layers.max_pooling2d(inputs=norm3, pool_size=[2, 2], strides=2)
+  pool3_flat = tf.reshape(pool3, [-1, 3 * 3 * 64])
+
+  dense = tf.layers.dense(inputs=pool3_flat, units=1024, activation=tf.nn.relu)
   dropout = tf.layers.dropout(inputs=dense, rate=keep_prob)
 
   return tf.layers.dense(inputs=dropout, units=10)
@@ -85,11 +95,11 @@ def train(model_name):
   if tf.gfile.Exists(log_dir):
     tf.gfile.DeleteRecursively(log_dir)
 
-  model_builder = {"tutorial":tutorial_model, "simple":simple_model,
+  model_builder = {"tutorial":tutorial_model, "adam":tutorial_model,
                   "enhance":enhance_model}
   optimizer_builder = {"tutorial":tf.train.GradientDescentOptimizer, 
-                      "simple": tf.train.GradientDescentOptimizer,
-                      "enhance": tf.train.RMSPropOptimizer}
+                      "adam": tf.train.AdamOptimizer,
+                      "enhance": tf.train.AdamOptimizer}
 
   mnist = input_data.read_data_sets(FLAGS.data_dir)
   sess = tf.InteractiveSession()
@@ -112,8 +122,7 @@ def train(model_name):
 
   # Merge all the summaries and write them out to
   merged = tf.summary.merge_all()
-  #train_writer = tf.summary.FileWriter(log_dir + '/train', sess.graph)
-  test_writer = tf.summary.FileWriter(log_dir + '/test')
+  summary_writer = tf.summary.FileWriter(log_dir + '/test')
   tf.global_variables_initializer().run()
 
   for i in range(FLAGS.max_steps + 1):      
@@ -126,16 +135,15 @@ def train(model_name):
       run_metadata = tf.RunMetadata()
       loss, _ = sess.run([cross_entropy, train_step], feed_dict=train_dict,
                         options=run_options, run_metadata=run_metadata)
-      test_writer.add_run_metadata(run_metadata, 'step%03d' % i)
+      summary_writer.add_run_metadata(run_metadata, 'step%03d' % i)
       
       summary, test_acc = sess.run([merged, accuracy], feed_dict=test_dict)
-      test_writer.add_summary(summary, i)
+      summary_writer.add_summary(summary, i)
       print('Test Accuracy at Step %4d: %f Loss %f' % (i, test_acc, loss))
     else:
       sess.run([train_step], feed_dict=train_dict)
 
-  #train_writer.close()
-  test_writer.close()
+  summary_writer.close()
 
 def main(unused_argv):
   train(FLAGS.model_name)

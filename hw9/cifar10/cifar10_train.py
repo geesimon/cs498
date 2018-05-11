@@ -61,21 +61,6 @@ tf.app.flags.DEFINE_integer('log_frequency', 100,
                             """How often to log results to the console.""")
 
 
-EVALUATE_BATCH_SIZE = 1000
-def evaluate(session, correct_prediction):
-  total_count = 0
-  total_correct_count = 0
-
-  for i in range(cifar10_input.NUM_EXAMPLES_PER_EPOCH_FOR_EVAL // EVALUATE_BATCH_SIZE):
-    correct_count = np.sum(session.run([correct_prediction]))
-    total_correct_count += correct_count
-    total_count += EVALUATE_BATCH_SIZE
-  
-  accuracy = total_correct_count / total_count
-
-  return accuracy
-
-
 def train():
   """Train CIFAR-10 for a number of steps."""
   with tf.Graph().as_default():
@@ -137,17 +122,14 @@ def train():
 
 
     with tf.train.MonitoredTrainingSession(
-        hooks=[tf.train.StopAtStepHook(last_step=FLAGS.max_steps),
+        hooks=[tf.train.StopAtStepHook(last_step=FLAGS.max_steps + 1),
                tf.train.NanTensorHook(loss)],
         config=tf.ConfigProto(
             log_device_placement=FLAGS.log_device_placement)) as sess:
-    #with tf.Session() as sess:
-    #  for step in range(FLAGS.max_steps):
       while not sess.should_stop():
         step, _ = sess.run([global_step, train_op])
         if step % FLAGS.log_frequency == 0:
           test_acc, summary = sess.run([test_accuracy, summary_op])
-          #test_acc = evaluate(sess, test_correct_prediction)
           print("Step:%4d Test Accuracy:%f"%(step, test_acc))
           summary_writer.add_summary(summary, step)
 
