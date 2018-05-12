@@ -45,27 +45,30 @@ with tf.Graph().as_default():
     inputs_ = tf.placeholder(tf.float32, [None, 32, 32, 3])
     labels_ = tf.placeholder(tf.int64, [None])
 
-    vgg.build(inputs_)
+    vgg.build(train_images)
 
-    cross_entropy = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=labels_, 
+    cross_entropy = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=train_labels, 
                     logits=vgg.fc8))
     train_step = tf.train.AdamOptimizer().minimize(cross_entropy)
 
-    predicted = tf.nn.softmax(vgg.fc8)
-    correct_pred = tf.equal(tf.argmax(predicted, 1), labels_)
-    accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
-    tf.summary.scalar('accuracy', accuracy)
-    summary_op = tf.summary.merge_all()
+    #predicted = tf.nn.softmax(vgg.fc8)
+    #correct_pred = tf.equal(tf.argmax(predicted, 1), labels_)
+    #accuracy = tf.reduce_mean(tf.cast(correct_pred, tf.float32))
+    #tf.summary.scalar('accuracy', accuracy)
+    #summary_op = tf.summary.merge_all()
     
     with tf.train.MonitoredSession() as sess:
-        images, labels = sess.run([test_images, test_labels])
-        test_dict = {inputs_:images, labels_: labels}
+        #images, labels = sess.run([train_images, train_labels])
+        #test_dict = {inputs_:images, labels_: labels}
         for i in range(FLAGS.max_steps + 1):
-            images, labels = sess.run([train_images, train_labels])
-            train_dict = {inputs_:images, labels_:labels}
+            #images, labels = sess.run([train_images, train_labels])
 
-            _, loss = sess.run([train_step, cross_entropy], feed_dict=train_dict)  
+            #train_dict = {inputs_:images, labels_:labels}
+
+            #_, loss = sess.run([train_step, cross_entropy], feed_dict=train_dict)
+            _, loss = sess.run([train_step, cross_entropy])
 
             if i % FLAGS.log_frequency == 0:
-                test_acc = sess.run(accuracy, feed_dict=test_dict)
-                print("Step:%4d Loss:%f Test Accuracy:%f"%(i, loss, test_acc))
+                #test_acc = sess.run(accuracy, feed_dict=test_dict)
+                #print("Step:%4d Loss:%f Test Accuracy:%f"%(i, loss, test_acc))
+                print(loss)
